@@ -21,9 +21,13 @@
 
 #include <queue>
 #include <iostream>
+#include <cstring>
+#include <cstdlib>
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+
 #include <pthread.h>
 
 using namespace std;
@@ -39,12 +43,13 @@ void* handleClient(void* param);
  * ThreadInfo struct for managing threads
  */
 typedef struct threadInfo {
-    int workerId;
-    bool connected;
+    int workerId;   // ID of the thread
+    bool connected; // If the worker is actuall in use
+    int socketFd;   // The ID of the socket to write to
 } ThreadInfo;
 
 ThreadInfo* threadInfoList;
-bool quitFlag;
+bool QUIT_FLAG;
 
 /**
  * Main method used to manage worker threads
@@ -58,7 +63,7 @@ int main(int argc, char* argv[]) {
     
     pthread_attr_init(&threadAttr);
 
-    quitFlag = false;
+    QUIT_FLAG = false;
 
     // initialize thread information & start threads
     for(i = 0; i < MAX_THREADS; i++) {
@@ -69,7 +74,28 @@ int main(int argc, char* argv[]) {
     }
 
     // main loop waits for a new connection and assigns to a thread if one is available
-    //while(!quitFlag) {
+    //while(!QUIT_FLAG) {
+        
+        struct sockaddr_storage clientAddr;
+        socklen_t addrSize;
+        struct addrinfo hints, *res;
+        int sockFd, clientFd;
+
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_PASSIVE;
+
+        getaddrinfo(NULL, 19100, &hints, &res);
+
+        sockFd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+        
+        if(sockFd < 0) {
+            cout << "Binded to socket \n";
+        }
+        else {
+            cout << "failed to bind to socket \n";
+        }
 
     //}
 
@@ -94,6 +120,34 @@ void* handleClient(void* param) {
 
     int myId = ((ThreadInfo*)param)->workerId;
 
+    // perpetually try to work
+    //while(!QUIT_FLAG) {
+    if(true) {
+
+
+    }
+
     cout << "in thread " << myId << "\n";
 }
 
+
+/**
+ * Find a worker thread that is not busy. If none are available, return -1.
+ * @param workers A pointer to the array of worker information
+ * @param noWorkers The number of workers available
+ * @return The index of the next available worker or -1 if there are none
+ */
+int findAvailableWorker(ThreadInfo* workers, const int noWorkers) {
+    if(workers == NULL) {
+        return -1;
+    }
+
+    int i;
+    for(i = 0; i < noWorkers; i++) {
+        if(!workers[i].connected) {
+            return i;
+        }
+    }
+
+    return -1;
+}
