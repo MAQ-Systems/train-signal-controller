@@ -21,6 +21,9 @@
 
 #include <queue>
 #include <iostream>
+
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <pthread.h>
 
 using namespace std;
@@ -53,6 +56,8 @@ int main(int argc, char* argv[]) {
     pthread_t* threadIds = new pthread_t[MAX_THREADS];
     pthread_attr_t threadAttr;
     
+    pthread_attr_init(&threadAttr);
+
     quitFlag = false;
 
     // initialize thread information & start threads
@@ -87,7 +92,7 @@ int main(int argc, char* argv[]) {
  */
 void* handleClient(void* param) {
 
-    int myId = 0;//((ThreadInfo*)param)->workerId;
+    int myId = ((ThreadInfo*)param)->workerId;
 
     cout << "in thread " << myId << "\n";
 }
