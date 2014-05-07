@@ -24,8 +24,11 @@
 #include <cstring>
 #include <cstdlib>
 
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 
 #include <pthread.h>
@@ -34,6 +37,8 @@ using namespace std;
 
 
 #define MAX_THREADS 4
+#define SERVER_PORT "19100"
+#define SERVER_BACKLOG 5
 
 
 void* handleClient(void* param);
@@ -57,13 +62,14 @@ bool QUIT_FLAG;
 int main(int argc, char* argv[]) {
 
     int i;
+    QUIT_FLAG = false;
+
+    // thread vars
     threadInfoList = new ThreadInfo[MAX_THREADS];
     pthread_t* threadIds = new pthread_t[MAX_THREADS];
     pthread_attr_t threadAttr;
     
     pthread_attr_init(&threadAttr);
-
-    QUIT_FLAG = false;
 
     // initialize thread information & start threads
     for(i = 0; i < MAX_THREADS; i++) {
@@ -73,30 +79,33 @@ int main(int argc, char* argv[]) {
         pthread_create(&threadIds[i], &threadAttr, handleClient, &threadInfoList[i]);
     }
 
+    // socket vars
+    struct sockaddr_storage clientAddr;
+    socklen_t addrSize;
+    struct addrinfo hints, *res;
+    int sockFd, clientFd;
+
+    // init socket info
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    getaddrinfo(NULL, SERVER_PORT, &hints, &res);
+    sockFd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+    if(sockFd < 0) {
+        cout << "failed to bind to socket \n" << strerror(errno);
+        exit(1);
+    }
+
+    bind(sockFd, res->ai_addr, res->ai_addrlen);
+    listen(sockFd, SERVER_BACKLOG);
+
     // main loop waits for a new connection and assigns to a thread if one is available
     //while(!QUIT_FLAG) {
-        
-        struct sockaddr_storage clientAddr;
-        socklen_t addrSize;
-        struct addrinfo hints, *res;
-        int sockFd, clientFd;
-
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags = AI_PASSIVE;
-
-        getaddrinfo(NULL, 19100, &hints, &res);
-
-        sockFd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        
-        if(sockFd < 0) {
-            cout << "Binded to socket \n";
-        }
-        else {
-            cout << "failed to bind to socket \n";
-        }
-
+        addrSize = sizeof(clientAddr);
+        clientFd = accept(sockFd, (struct sockaddr *)&clientAddr, &addrSize);        
     //}
 
     // join threads
