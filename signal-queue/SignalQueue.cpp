@@ -39,9 +39,10 @@
 using namespace std;
 
 
-#define MAX_THREADS 4
+#define MAX_THREADS 3
+#define MAX_QUEUE 50
 #define SERVER_PORT "19100"
-#define SERVER_BACKLOG 5
+#define SERVER_BACKLOG 4
 
 
 /**
@@ -51,10 +52,13 @@ typedef struct threadInfo {
     int workerId;   // ID of the thread
     bool connected; // If the worker is actuall in use
     int socketFd;   // The ID of the socket to write to
+    bool queueWriter; // True if the client requests to write to the queue
 } ThreadInfo;
 
 ThreadInfo* threadInfoList;
+pthread_mutex_t* threadMutexes; // used to stop and start particular threads (will block via spinlock or sleeping)
 bool QUIT_FLAG;
+queue<char*> signalQueue;
 
 
 // prototypes
@@ -71,6 +75,7 @@ int main(int argc, char* argv[]) {
     QUIT_FLAG = false;
 
     // thread vars
+    threadMutexes = new pthread_mutex_t[MAX_THREADS];
     threadInfoList = new ThreadInfo[MAX_THREADS];
     pthread_t* threadIds = new pthread_t[MAX_THREADS];
     pthread_attr_t threadAttr;
@@ -81,6 +86,7 @@ int main(int argc, char* argv[]) {
     for(i = 0; i < MAX_THREADS; i++) {
         threadInfoList[i].workerId = i;
         threadInfoList[i].connected = false;
+        pthread_mutex_lock(&threadMutexes[i]);
 
         pthread_create(&threadIds[i], &threadAttr, handleClient, &threadInfoList[i]);
     }
@@ -130,22 +136,19 @@ int main(int argc, char* argv[]) {
             close(clientFd);
         }
         else {
+cout << "accepted";
             // if we succeeded, send initiation message
             string welcomeMsg = "{\"error\":false}";
             //string errorMsg = "e:0";
             send(clientFd, welcomeMsg.c_str(), welcomeMsg.length(), 0);
-
+            
             // set a thread as connected and unlock mutex for that thread
             threadInfoList[readyWorker].socketFd = clientFd;
             threadInfoList[readyWorker].connected = true;
-            // finally unlock mutex
+
+            // finally unlock mutex so the thread starts going again
+            pthread_mutex_unlock(&threadMutexes[readyWorker]);
         }
-
-        //char* recvBuff = new char[1024];
-        //int size = 0;
-        //recv(clientFd, recvBuff, 1024, 0);
-
-        //cout << recvBuff;
     }
 
     // join threads
@@ -171,18 +174,37 @@ void* handleClient(void* param) {
 
     int myId = ((ThreadInfo*)param)->workerId;
     
-    bool needConnection = true;
-
     // perpetually try to work
-    //while(!QUIT_FLAG) {
-    while(needConnection) {
+    while(!QUIT_FLAG) {
         if(threadInfoList[myId].connected) {
-            needConnection = false;
 
-            stringstream msgStream;
-            msgStream << "hello from thread " << myId;
-            string msg = msgStream.str();
-            send(threadInfoList[myId].socketFd, msg.c_str(), msg.length(), 0);
+            // is the client going to be a reader or a writer?
+            char cType;
+            int size = recv(threadInfoList[myId].socketFd, &cType, 1, 0);
+
+            if(cType == 'R' || cType == 'r') {
+                // client is a reader 
+                while(!signalQueue.empty()) {
+                    if(signalQueue.size() < 50) {
+                        char sig[3];
+                        int size = recv(threadInfoList[myId].socketFd, &cType, 3, 0);
+                        cout << sig;
+                    }
+                }
+            }
+            else if(cType == 'W' || cType == 'w') {
+                // client is a writer
+                int size;
+                while(size > 0) {
+
+                }
+            }
+
+            //stringstream msgStream;
+            //msgStream << "hello from thread " << myId;
+            //string msg = msgStream.str();
+
+//            send(threadInfoList[myId].socketFd, msg.c_str(), msg.length(), 0);
             close(threadInfoList[myId].socketFd);
         }
     }
@@ -211,3 +233,4 @@ int findAvailableWorker(ThreadInfo* workers, const int noWorkers) {
 
     return -1;
 }
+
