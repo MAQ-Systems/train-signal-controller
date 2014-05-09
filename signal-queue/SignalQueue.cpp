@@ -53,10 +53,10 @@ typedef struct threadInfo {
     bool connected; // If the worker is actuall in use
     int socketFd;   // The ID of the socket to write to
     bool queueWriter; // True if the client requests to write to the queue
+    pthread_mutex_t threadMutex; // used to stop and start particular a thread (will block via spinlock or sleeping)
 } ThreadInfo;
 
 ThreadInfo* threadInfoList;
-pthread_mutex_t* threadMutexes; // used to stop and start particular threads (will block via spinlock or sleeping)
 bool QUIT_FLAG;
 queue<char*> signalQueue;
 
@@ -75,7 +75,6 @@ int main(int argc, char* argv[]) {
     QUIT_FLAG = false;
 
     // thread vars
-    threadMutexes = new pthread_mutex_t[MAX_THREADS];
     threadInfoList = new ThreadInfo[MAX_THREADS];
     pthread_t* threadIds = new pthread_t[MAX_THREADS];
     pthread_attr_t threadAttr;
@@ -86,7 +85,7 @@ int main(int argc, char* argv[]) {
     for(i = 0; i < MAX_THREADS; i++) {
         threadInfoList[i].workerId = i;
         threadInfoList[i].connected = false;
-        pthread_mutex_lock(&threadMutexes[i]);
+        pthread_mutex_lock(&threadInfoList[i].threadMutex);
 
         pthread_create(&threadIds[i], &threadAttr, handleClient, &threadInfoList[i]);
     }
@@ -136,7 +135,6 @@ int main(int argc, char* argv[]) {
             close(clientFd);
         }
         else {
-cout << "accepted";
             // if we succeeded, send initiation message
             string welcomeMsg = "{\"error\":false}";
             //string errorMsg = "e:0";
@@ -147,7 +145,7 @@ cout << "accepted";
             threadInfoList[readyWorker].connected = true;
 
             // finally unlock mutex so the thread starts going again
-            pthread_mutex_unlock(&threadMutexes[readyWorker]);
+            pthread_mutex_unlock(&threadInfoList[readyWorker].threadMutex);
         }
     }
 
@@ -176,6 +174,9 @@ void* handleClient(void* param) {
     
     // perpetually try to work
     while(!QUIT_FLAG) {
+
+        pthread_mutex_lock(&threadInfoList[myId].threadMutex);
+
         if(threadInfoList[myId].connected) {
 
             // is the client going to be a reader or a writer?
