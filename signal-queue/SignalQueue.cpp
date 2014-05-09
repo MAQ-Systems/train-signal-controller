@@ -19,6 +19,7 @@
  *           - [7] unused
  */
 
+
 #include <queue>
 #include <iostream>
 #include <string>
@@ -35,6 +36,7 @@
 #include <netinet/in.h>
 
 #include <pthread.h>
+
 
 using namespace std;
 
@@ -85,6 +87,8 @@ int main(int argc, char* argv[]) {
     for(i = 0; i < MAX_THREADS; i++) {
         threadInfoList[i].workerId = i;
         threadInfoList[i].connected = false;
+        
+        pthread_mutex_init(&threadInfoList[i].threadMutex,NULL);
         pthread_mutex_lock(&threadInfoList[i].threadMutex);
 
         pthread_create(&threadIds[i], &threadAttr, handleClient, &threadInfoList[i]);
@@ -175,39 +179,55 @@ void* handleClient(void* param) {
     // perpetually try to work
     while(!QUIT_FLAG) {
 
+        // wait for master to unlock this thread
         pthread_mutex_lock(&threadInfoList[myId].threadMutex);
+        cout << "Client connected to thread " << myId << "\n";
 
         if(threadInfoList[myId].connected) {
 
+            // thread mutex will be unlocked at this point, immediately relock this thread's mutex once we 
+            // are past the connected condition so we don't automatically start again once this client disconnects
+            pthread_mutex_lock(&threadInfoList[myId].threadMutex);
+
+    cout << "OK\n";
             // is the client going to be a reader or a writer?
             char cType;
             int size = recv(threadInfoList[myId].socketFd, &cType, 1, 0);
-
+    cout << cType << "\n";
             if(cType == 'R' || cType == 'r') {
+    cout << "im a reader";
                 // client is a reader 
-                while(!signalQueue.empty()) {
+                while(!signalQueue.empty() || size < 1) {
                     if(signalQueue.size() < 50) {
-                        char sig[3];
-                        int size = recv(threadInfoList[myId].socketFd, &cType, 3, 0);
+                        char* sig = new char[3];
+                        size = send(threadInfoList[myId].socketFd, sig, 3, 0);
                         cout << sig;
+                    }
+                    
+                    if(size < 1) {
+                        cout << "Client disconnected!\n";
                     }
                 }
             }
             else if(cType == 'W' || cType == 'w') {
                 // client is a writer
-                int size;
+    cout << "im a writer";
                 while(size > 0) {
-
+                    char* sig = new char[3];
+                    size = recv(threadInfoList[myId].socketFd, &sig, 3, 0);
+                    cout << sig;
                 }
             }
 
+    cout << "closing socket";
             //stringstream msgStream;
             //msgStream << "hello from thread " << myId;
             //string msg = msgStream.str();
 
-//            send(threadInfoList[myId].socketFd, msg.c_str(), msg.length(), 0);
             close(threadInfoList[myId].socketFd);
         }
+        
+        threadInfoList[myId].connected = false;
     }
 
     cout << "Exiting thread " << myId << "\n";
