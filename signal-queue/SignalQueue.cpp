@@ -54,13 +54,11 @@ typedef struct threadInfo {
     int workerId;   // ID of the thread
     bool connected; // If the worker is actuall in use
     int socketFd;   // The ID of the socket to write to
-    bool queueWriter; // True if the client requests to write to the queue
     pthread_mutex_t threadMutex; // used to stop and start particular a thread (will block via spinlock or sleeping)
 } ThreadInfo;
 
-ThreadInfo* threadInfoList;
 bool QUIT_FLAG;
-queue<char*> signalQueue;
+//queue<char*> signalQueue;
 
 
 // prototypes
@@ -77,12 +75,9 @@ int main(int argc, char* argv[]) {
     QUIT_FLAG = false;
 
     // thread vars
-    threadInfoList = new ThreadInfo[MAX_THREADS];
+    ThreadInfo* threadInfoList = new ThreadInfo[MAX_THREADS];
     pthread_t* threadIds = new pthread_t[MAX_THREADS];
-    pthread_attr_t threadAttr;
     
-    pthread_attr_init(&threadAttr);
-
     // initialize thread information & start threads
     for(i = 0; i < MAX_THREADS; i++) {
         threadInfoList[i].workerId = i;
@@ -91,7 +86,8 @@ int main(int argc, char* argv[]) {
         pthread_mutex_init(&threadInfoList[i].threadMutex,NULL);
         pthread_mutex_lock(&threadInfoList[i].threadMutex);
 
-        pthread_create(&threadIds[i], &threadAttr, handleClient, &threadInfoList[i]);
+        // using NULL for pthread_attr_t (just use default behavior)
+        pthread_create(&threadIds[i], NULL, handleClient, &threadInfoList[i]);
     }
 
     // socket vars
@@ -101,25 +97,27 @@ int main(int argc, char* argv[]) {
     int sockFd, clientFd;
 
     // init socket info
-    memset(&hints, 0, sizeof(hints));
+    memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
+    hints.ai_protocol = 0;
 
     getaddrinfo(NULL, SERVER_PORT, &hints, &res);
     sockFd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
     if(sockFd < 0) {
-        cout << "failed to bind to socket \n" << strerror(errno);
+        cout << "Failed to create listening socket \n" << strerror(errno);
         exit(1);
     }
 
     bind(sockFd, res->ai_addr, res->ai_addrlen);
     listen(sockFd, SERVER_BACKLOG);
 
+    addrSize = sizeof(clientAddr);
+
     // main loop waits for a new connection and assigns to a thread if one is available
     while(!QUIT_FLAG) {
-        addrSize = sizeof(clientAddr);
         clientFd = accept(sockFd, (struct sockaddr *)&clientAddr, &addrSize);
 
         if(clientFd < 0) {
@@ -135,14 +133,14 @@ int main(int argc, char* argv[]) {
             // if we failed, send error message
             string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
             //string errorMsg = "e:1";
-            send(clientFd, errorMsg.c_str(), errorMsg.length(), 0);
+            send(clientFd, errorMsg.c_str(), errorMsg.length()+1, 0);
             close(clientFd);
         }
         else {
             // if we succeeded, send initiation message
             string welcomeMsg = "{\"error\":false}";
             //string errorMsg = "e:0";
-            send(clientFd, welcomeMsg.c_str(), welcomeMsg.length(), 0);
+            send(clientFd, welcomeMsg.c_str(), welcomeMsg.length()+1, 0);
             
             // set a thread as connected and unlock mutex for that thread
             threadInfoList[readyWorker].socketFd = clientFd;
@@ -174,27 +172,38 @@ int main(int argc, char* argv[]) {
  */
 void* handleClient(void* param) {
 
-    int myId = ((ThreadInfo*)param)->workerId;
-    
+    // keep handle to thread info (this will be changed by master thread)
+    ThreadInfo* tInfo = (ThreadInfo*)param;   
+
+    int myId = tInfo->workerId;
+ 
     // perpetually try to work
     while(!QUIT_FLAG) {
 
         // wait for master to unlock this thread
-        pthread_mutex_lock(&threadInfoList[myId].threadMutex);
-        cout << "Client connected to thread " << myId << "\n";
+        pthread_mutex_lock(&tInfo->threadMutex);
+    cout << "Thread Info:\n";
+    cout << tInfo->workerId << "\n";
+    cout << tInfo->connected << "\n";
+    cout << tInfo->socketFd << "\n";
 
-        if(threadInfoList[myId].connected) {
+
+        cout << "Client connected to thread " << myId << "\n";
+        int clientSoc = tInfo->socketFd;
+
+        if(tInfo->connected) {
 
             // thread mutex will be unlocked at this point, immediately relock this thread's mutex once we 
             // are past the connected condition so we don't automatically start again once this client disconnects
-            pthread_mutex_lock(&threadInfoList[myId].threadMutex);
+       //     pthread_mutex_lock(&(tInfo->threadMutex));
 
     cout << "OK\n";
             // is the client going to be a reader or a writer?
-            char cType;
-            int size = recv(threadInfoList[myId].socketFd, &cType, 1, 0);
-    cout << cType << "\n";
-            if(cType == 'R' || cType == 'r') {
+            char* cType = new char[10];
+            int size = recv(clientSoc, cType, 1, 0);
+    cout << size;
+    cout << cType[0] << "\n";
+/*            if(cType == 'R' || cType == 'r') {
     cout << "im a reader";
                 // client is a reader 
                 while(!signalQueue.empty() || size < 1) {
@@ -209,12 +218,12 @@ void* handleClient(void* param) {
                     }
                 }
             }
-            else if(cType == 'W' || cType == 'w') {
+            else*/ if(cType[0] == 'W' || cType[0] == 'w') {
                 // client is a writer
     cout << "im a writer";
                 while(size > 0) {
-                    char* sig = new char[3];
-                    size = recv(threadInfoList[myId].socketFd, &sig, 3, 0);
+                    char* sig = new char[10];
+                    size = recv(clientSoc, sig, 3, 0);
                     cout << sig;
                 }
             }
@@ -224,10 +233,10 @@ void* handleClient(void* param) {
             //msgStream << "hello from thread " << myId;
             //string msg = msgStream.str();
 
-            close(threadInfoList[myId].socketFd);
+            close(clientSoc);
         }
         
-        threadInfoList[myId].connected = false;
+        tInfo->connected = false;
     }
 
     cout << "Exiting thread " << myId << "\n";
