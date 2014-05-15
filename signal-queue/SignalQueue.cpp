@@ -58,7 +58,8 @@ typedef struct threadInfo {
 } ThreadInfo;
 
 bool QUIT_FLAG;
-//queue<char*> signalQueue;
+queue<char*> signalQueue;
+pthread_mutex_t signalQueueMutex;
 
 
 // prototypes
@@ -77,6 +78,7 @@ int main(int argc, char* argv[]) {
     // thread vars
     ThreadInfo* threadInfoList = new ThreadInfo[MAX_THREADS];
     pthread_t* threadIds = new pthread_t[MAX_THREADS];
+    pthread_mutex_init(&signalQueueMutex,NULL);
     
     // initialize thread information & start threads
     for(i = 0; i < MAX_THREADS; i++) {
@@ -182,49 +184,50 @@ void* handleClient(void* param) {
 
         // wait for master to unlock this thread
         pthread_mutex_lock(&tInfo->threadMutex);
-    cout << "Thread Info:\n";
-    cout << tInfo->workerId << "\n";
-    cout << tInfo->connected << "\n";
-    cout << tInfo->socketFd << "\n";
-
 
         cout << "Client connected to thread " << myId << "\n";
         int clientSoc = tInfo->socketFd;
 
         if(tInfo->connected) {
 
-            // thread mutex will be unlocked at this point, immediately relock this thread's mutex once we 
-            // are past the connected condition so we don't automatically start again once this client disconnects
-       //     pthread_mutex_lock(&(tInfo->threadMutex));
-
-    cout << "OK\n";
             // is the client going to be a reader or a writer?
             char* cType = new char[10];
             int size = recv(clientSoc, cType, 1, 0);
-    cout << size;
-    cout << cType[0] << "\n";
-/*            if(cType == 'R' || cType == 'r') {
+            if(cType[0] == 'R' || cType[0] == 'r') {
     cout << "im a reader";
-                // client is a reader 
-                while(!signalQueue.empty() || size < 1) {
-                    if(signalQueue.size() < 50) {
-                        char* sig = new char[3];
-                        size = send(threadInfoList[myId].socketFd, sig, 3, 0);
-                        cout << sig;
-                    }
-                    
+                // client is a reader
+                char* sig = NULL; 
+                while(!signalQueue.empty() && size > 0) {
+                    // make sure I am the only thread modifying the queue
+                    pthread_mutex_lock(&signalQueueMutex);
+                    sig = signalQueue.front();
+                    signalQueue.pop();
+                    // done modifying the queue
+                    pthread_mutex_unlock(&signalQueueMutex);
+                    size = send(clientSoc, sig, 3, 0);
+                    delete[] sig;
+
                     if(size < 1) {
                         cout << "Client disconnected!\n";
                     }
                 }
             }
-            else*/ if(cType[0] == 'W' || cType[0] == 'w') {
+            else if(cType[0] == 'W' || cType[0] == 'w') {
                 // client is a writer
     cout << "im a writer";
                 while(size > 0) {
                     char* sig = new char[10];
                     size = recv(clientSoc, sig, 3, 0);
                     cout << sig;
+                     // make sure I am the only thread modifying the queue
+                    pthread_mutex_lock(&signalQueueMutex);
+
+                    if(signalQueue.size() < 50) {
+                        signalQueue.push(sig);
+                    }
+                    // done modifying the queue
+                    pthread_mutex_unlock(&signalQueueMutex);
+
                 }
             }
 
