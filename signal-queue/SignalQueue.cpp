@@ -133,15 +133,15 @@ int main(int argc, char* argv[]) {
         int readyWorker = findAvailableWorker(threadInfoList, MAX_THREADS);
         if(readyWorker < 0) {
             // if we failed, send error message
-            string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
-            //string errorMsg = "e:1";
+            //string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
+            string errorMsg = "e:1";
             send(clientFd, errorMsg.c_str(), errorMsg.length()+1, 0);
             close(clientFd);
         }
         else {
             // if we succeeded, send initiation message
-            string welcomeMsg = "{\"error\":false}";
-            //string errorMsg = "e:0";
+            //string welcomeMsg = "{\"error\":false}";
+            string welcomeMsg = "e:0";
             send(clientFd, welcomeMsg.c_str(), welcomeMsg.length()+1, 0);
             
             // set a thread as connected and unlock mutex for that thread
@@ -204,7 +204,8 @@ void* handleClient(void* param) {
                     signalQueue.pop();
                     // done modifying the queue
                     pthread_mutex_unlock(&signalQueueMutex);
-                    size = send(clientSoc, sig, 3, 0);
+                    cout << sig << " " << strlen(sig);
+                    size = send(clientSoc, sig, strlen(sig), 0);
                     delete[] sig;
 
                     if(size < 1) {
@@ -218,11 +219,14 @@ void* handleClient(void* param) {
                 while(size > 0) {
                     char* sig = new char[10];
                     size = recv(clientSoc, sig, 3, 0);
-                    cout << sig;
+                    if(size > 0) {
+                        sig[size+1] = '\0';
+                        cout << sig << " " << strlen(sig);
+                    }
                      // make sure I am the only thread modifying the queue
                     pthread_mutex_lock(&signalQueueMutex);
 
-                    if(signalQueue.size() < 50) {
+                    if(signalQueue.size() < 50 && size > 0) {
                         signalQueue.push(sig);
                     }
                     // done modifying the queue
