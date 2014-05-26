@@ -7,20 +7,27 @@
  * Protocol:
  *       Since there are a grand total of 8 possible things the signal
  *       can do, the message format will be simple:
- *       - One byte followed immediately by a null terminator ('\0')
- *       - Signal will operate based on which bits are set in the above byte
- *           - [0] blink flag
- *           - [1] red flag
- *           - [2] yellow flag
- *           - [3] green flag
- *           - [4] turn lamp on
- *           - [5] turn lamp off
- *           - [6] unused
+ *       - R/W/X to specify client type
+ *       - '|' delimiter
+ *       - T/F to indicate error
+ *       - '|' delimiter
+ *       - One byte for state - based on which bits are set in this byte
+ *           - [0] ALWAYS SET TO 1
+ *           - [1] blink flag
+ *           - [2] red flag
+ *           - [3] yellow flag
+ *           - [4] green flag
+ *           - [5] turn lamp on
+ *           - [6] turn lamp off
  *           - [7] unused
+ *       - '\0' to close the message
+ * Reserved Chars:
+ *      '[', ']', '|', '\0'
  */
 
 
 #include <queue>
+#include <vector>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -57,6 +64,16 @@ typedef struct threadInfo {
     pthread_mutex_t threadMutex; // used to stop and start particular a thread (will block via spinlock or sleeping)
 } ThreadInfo;
 
+/**
+ * SignalMessage struct for parsing signal messages
+ * NOTE: See comments at top of file for documentation on these fields
+ */
+typedef struct signalMessage {
+    char clientType;
+    bool error;
+    char signalState;
+} SignalMessage;
+
 bool QUIT_FLAG;
 queue<char*> signalQueue;
 pthread_mutex_t signalQueueMutex;
@@ -65,6 +82,8 @@ pthread_mutex_t signalQueueMutex;
 // prototypes
 void* handleClient(void* param);
 int findAvailableWorker(ThreadInfo* workers, const int noWorkers);
+bool isValidMessage(char* msg, int len);
+SignalMessage* parseSignalMessage(char* msg, int len);
 
 
 /**
@@ -134,14 +153,14 @@ int main(int argc, char* argv[]) {
         if(readyWorker < 0) {
             // if we failed, send error message
             //string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
-            string errorMsg = "e:1";
+            string errorMsg = "[1|T|X]";
             send(clientFd, errorMsg.c_str(), errorMsg.length()+1, 0);
             close(clientFd);
         }
         else {
             // if we succeeded, send initiation message
             //string welcomeMsg = "{\"error\":false}";
-            string welcomeMsg = "e:0";
+            string welcomeMsg = "[1|F|X]";
             send(clientFd, welcomeMsg.c_str(), welcomeMsg.length()+1, 0);
             
             // set a thread as connected and unlock mutex for that thread
@@ -191,12 +210,18 @@ void* handleClient(void* param) {
         if(tInfo->connected) {
 
             // is the client going to be a reader or a writer?
-            char* cType = new char[10];
-            int size = recv(clientSoc, cType, 1, 0);
-            if(cType[0] == 'R' || cType[0] == 'r') {
+            char* sig = new char[32];
+            int size = recv(clientSoc, cType, 32, 0);
+            SignalMessage* msg = (cType, size);
+            char clientType = msg->clientType;
+            // clean up one-time use info
+            delete msg;
+            delete sig;
+
+            if(clientType == 'R' || clientType == 'r') {
     cout << "im a reader";
                 // client is a reader
-                char* sig = NULL; 
+                sig = NULL; 
                 while(!signalQueue.empty() && size > 0) {
                     // make sure I am the only thread modifying the queue
                     pthread_mutex_lock(&signalQueueMutex);
@@ -213,12 +238,12 @@ void* handleClient(void* param) {
                     }
                 }
             }
-            else if(cType[0] == 'W' || cType[0] == 'w') {
+            else if(clientType == 'W' || clientType == 'w') {
                 // client is a writer
     cout << "im a writer";
                 while(size > 0) {
-                    char* sig = new char[10];
-                    size = recv(clientSoc, sig, 3, 0);
+                    sig = new char[32];
+                    size = recv(clientSoc, sig, 32, 0);
                     if(size > 0) {
                         sig[size+1] = '\0';
                         cout << sig << " " << strlen(sig);
@@ -226,7 +251,7 @@ void* handleClient(void* param) {
                      // make sure I am the only thread modifying the queue
                     pthread_mutex_lock(&signalQueueMutex);
 
-                    if(signalQueue.size() < 50 && size > 0) {
+                    if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
                         signalQueue.push(sig);
                     }
                     // done modifying the queue
@@ -270,4 +295,99 @@ int findAvailableWorker(ThreadInfo* workers, const int noWorkers) {
 
     return -1;
 }
+
+/**
+ * Determine if a given message loosely follows protocol
+ * @param msg The character array containing the message from a client
+ *            trying to write to the queue.
+ * @param len The length of the message
+ */
+bool isValidMessage(char* msg, int len) {
+    if(msg == NULL) {
+        return false;
+    }
+
+    // make sure message is not too large
+    if(len > 32) {
+        return false;
+    }
+
+    // make sure message closing character is present
+    if(msg[len-1] == '\0') {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Parse message into SignalMessage struct
+ * @param msg The char array pointer from the client
+ * @param len The length of the message
+ * @return Pointer to a new SignalMessage
+ */
+SignalMessage* parseSignalMessage(char* msg, int len) {
+    if(!isValidMessage(msg, len)) {
+        return NULL;
+    }
+
+    SignalMessage* sm = new SignalMessage;
+
+    // init signal message
+    sm->clientType = 'X';
+    sm->error = false;
+    sm->signalState = 1;
+
+    char *tokSave;
+    char *token = strrtok_r(msg, "|", &tokSave);
+    int elementNo = 0;
+
+    // fill struct by stepping through tokens (easy to keep default settings)
+    while(token != NULL) {
+        if(strlen(token) > 0) {
+            switch(elementNo) {
+                case 0:
+                    sm->clientType = token[0];
+                    break;
+
+                case 1:
+                    sm->error = token[0]=='T'?true:false;
+                    break;
+
+                case 2:
+                    sm->signalState = token[0];
+                    break;
+            }
+        }
+        elementNo++;
+        token = strrtok_r(NULL, "|", &tokSave);
+    }
+
+    return sm;
+}
+
+/**
+ * Split a string into a vector of substrings based on a delimiter
+ * @param rawInput The input string to process
+ * @param delimiter The character to split on
+ * @return A vector containing the split string
+ */
+/*vector<string*>* stringSplit(string rawInput, char delimiter) {
+    if(rawInput == NULL) {
+        return NULL;
+    }
+
+    int pos = 0;
+    int start = 0;
+
+    vector<string*>* subStrings = new vector<string*>;
+    while(pos != -1) {
+        start = pos;
+        pos = rawInput.find_first_of('|',delimiter);
+        subStrings->push_back(new string(rawInput, start, pos-start));
+        pos++;
+    }
+
+    return subStrings;
+}*/
 
