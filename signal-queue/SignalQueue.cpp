@@ -231,7 +231,7 @@ cout << "Signal State: " << msg->signalState << "\n";
             delete sig;
 
             if(clientType == 'R' || clientType == 'r') {
-    cout << "im a reader";
+    cout << "im a reader\n";
                 // client is a reader
                 sig = NULL; 
                 while(!signalQueue.empty() && size > 0) {
@@ -252,7 +252,7 @@ cout << "Signal State: " << msg->signalState << "\n";
             }
             else if(clientType == 'W' || clientType == 'w') {
                 // client is a writer
-    cout << "im a writer";
+    cout << "im a writer\n";
                 while(size > 0) {
                     sig = new char[32];
                     size = recv(clientSoc, sig, 32, 0);
@@ -272,7 +272,7 @@ cout << "Signal State: " << msg->signalState << "\n";
                 }
             }
 
-    cout << "closing socket";
+    cout << "closing socket\n";
             //stringstream msgStream;
             //msgStream << "hello from thread " << myId;
             //string msg = msgStream.str();
@@ -284,6 +284,7 @@ cout << "Signal State: " << msg->signalState << "\n";
     }
 
     cout << "Exiting thread " << myId << "\n";
+    cout.flush();
 }
 
 
