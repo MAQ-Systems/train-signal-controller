@@ -91,6 +91,13 @@ SignalMessage* parseSignalMessage(char* msg, int len);
  */
 int main(int argc, char* argv[]) {
 
+    // TODO: Remove this test data
+    char* temp = new char[10];
+    char data[] = "TESTDATA\0";
+    strcpy(temp,data);
+    signalQueue.push(temp);
+
+
     int i;
     QUIT_FLAG = false;
 
@@ -153,14 +160,14 @@ int main(int argc, char* argv[]) {
         if(readyWorker < 0) {
             // if we failed, send error message
             //string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
-            string errorMsg = "[1|T|X]";
+            string errorMsg = "1|T|X";
             send(clientFd, errorMsg.c_str(), errorMsg.length()+1, 0);
             close(clientFd);
         }
         else {
             // if we succeeded, send initiation message
             //string welcomeMsg = "{\"error\":false}";
-            string welcomeMsg = "[1|F|X]";
+            string welcomeMsg = "1|F|X";
             send(clientFd, welcomeMsg.c_str(), welcomeMsg.length()+1, 0);
             
             // set a thread as connected and unlock mutex for that thread
@@ -211,9 +218,14 @@ void* handleClient(void* param) {
 
             // is the client going to be a reader or a writer?
             char* sig = new char[32];
-            int size = recv(clientSoc, cType, 32, 0);
-            SignalMessage* msg = (cType, size);
+            int size = recv(clientSoc, sig, 32, 0);
+            SignalMessage* msg = parseSignalMessage(sig, size);
             char clientType = msg->clientType;
+
+cout << "Clien Type: " << msg->clientType << "\n";
+cout << "Error: " << msg->error << "\n";
+cout << "Signal State: " << msg->signalState << "\n";
+
             // clean up one-time use info
             delete msg;
             delete sig;
@@ -339,7 +351,7 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
     sm->signalState = 1;
 
     char *tokSave;
-    char *token = strrtok_r(msg, "|", &tokSave);
+    char *token = strtok_r(msg, "|", &tokSave);
     int elementNo = 0;
 
     // fill struct by stepping through tokens (easy to keep default settings)
@@ -360,7 +372,7 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
             }
         }
         elementNo++;
-        token = strrtok_r(NULL, "|", &tokSave);
+        token = strtok_r(NULL, "|", &tokSave);
     }
 
     return sm;
