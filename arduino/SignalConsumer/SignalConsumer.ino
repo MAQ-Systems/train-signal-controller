@@ -9,13 +9,14 @@
  
 #include <SPI.h>
 #include <Ethernet.h>
+#include <string.h>
 
-#define BUFFER_SIZE 128 // 128 should be plenty for anything we are receiving
+#define BUFFER_SIZE 32 // 32 should be plenty for anything we are receiving
 
 // network info
 byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x2C, 0x47};
 byte staticIp[] = {192, 168, 1, 150};
-byte serverIp[] = {69, 243, 189, 115};
+byte serverIp[] = {24, 15, 183, 66};
 char serverName[] = "www.iotitan.com";
 int serverPort = 19100;
 
@@ -62,15 +63,12 @@ boolean connectToServer() {
   }
   readBuffer[readBufferPos] = '\0';
   
-  int i;
-  for(i = 0; i < readBufferPos; i++) {
-    Serial.print(readBuffer[i]);
-  }
+  printData(readBuffer, readBufferPos);
   Serial.println();
   
   // notify server we intend to read
-  client.write('R');
-  client.flush();
+  client.print("R|F|1\0");
+  
   return true;
 }
 
@@ -80,6 +78,7 @@ boolean connectToServer() {
 void loop() {
   if(!client.connected()) {
     if(!connectToServer()) {
+      Serial.println("waiting to reconnect");
       delay(10000); // if we can't connect, wait 10 sec and try again
     }
   }
@@ -87,16 +86,31 @@ void loop() {
   if(client.connected()){
     // read intro message
     readBufferPos = 0;
+    Serial.println("BEGIN READ");
     while((readBuffer[readBufferPos] = client.read()) != '\0' && readBufferPos < BUFFER_SIZE) {
+      Serial.write(readBuffer[readBufferPos]);
       readBufferPos++;
     }
+    Serial.println("\nEND READ\n\n");
     readBuffer[readBufferPos] = '\0';
     
-    int i;
-    for(i = 0; i < readBufferPos; i++) {
-      Serial.print(readBuffer[i]);
-    }
+    printData(readBuffer, readBufferPos);
     Serial.println();
+  }
+}
+
+/**
+ * Print a c-string (an array of characters) untill null terminator or "len" is reached
+ * @param msg Pointer to character array
+ * @param len The length of the message/array
+ */
+void printData(char* msg, int len) {
+  int i;
+  for(i = 0; i < len; i++) {
+    if(msg[i] == '\0') {
+      break;
+    }
+    Serial.write(msg[i]);
   }
 }
 
