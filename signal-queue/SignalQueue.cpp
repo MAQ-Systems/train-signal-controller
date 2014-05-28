@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
     // TODO: Remove this test data
     char* temp = new char[10];
     char data[] = "TESTDATA\0";
-    strcpy(temp,data);
+    memcpy(temp,data,strlen(data)+1);
     signalQueue.push(temp);
 
 
@@ -241,8 +241,7 @@ cout << "Signal State: " << msg->signalState << "\n";
                     signalQueue.pop();
                     // done modifying the queue
                     pthread_mutex_unlock(&signalQueueMutex);
-                    cout << sig << " " << strlen(sig);
-                    size = send(clientSoc, sig, strlen(sig), 0);
+                    size = send(clientSoc, sig, strlen(sig)+1, 0);
                     delete[] sig;
 
                     if(size < 1) {
@@ -255,7 +254,7 @@ cout << "Signal State: " << msg->signalState << "\n";
     cout << "im a writer\n";
                 while(size > 0) {
                     sig = new char[32];
-                    size = recv(clientSoc, sig, 32, 0);
+                    size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
                     if(size > 0) {
                         sig[size+1] = '\0';
                         cout << sig << " " << strlen(sig);
