@@ -24,6 +24,10 @@ EthernetClient client;
 char readBuffer[BUFFER_SIZE];
 int readBufferPos;
 
+// prototypes
+boolean connectToServer();
+void printData(char* msg, int len);
+
 /**
  * Setup initial 
  */
@@ -77,26 +81,31 @@ boolean connectToServer() {
  */
 void loop() {
   if(!client.connected()) {
+    client.stop();
     if(!connectToServer()) {
       Serial.println("waiting to reconnect");
       delay(10000); // if we can't connect, wait 10 sec and try again
     }
+    else {
+      Serial.println("reconnected successfully!"); 
+    }
   }
   
   if(client.connected()){
-    // read intro message
+    
     readBufferPos = 0;
-    Serial.println("BEGIN READ");
-    while((readBuffer[readBufferPos] = client.read()) != '\0' && readBufferPos < BUFFER_SIZE) {
+    while((readBuffer[readBufferPos] = client.read()) != '\0' && readBufferPos < BUFFER_SIZE-1) {
       Serial.write(readBuffer[readBufferPos]);
       readBufferPos++;
     }
-    Serial.println("\nEND READ\n\n");
     readBuffer[readBufferPos] = '\0';
     
     printData(readBuffer, readBufferPos);
     Serial.println();
   }
+  
+  // wait for signal to switch for a bit before trying to read another
+  delay(5000);
 }
 
 /**
