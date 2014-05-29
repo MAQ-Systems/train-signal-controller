@@ -13,6 +13,24 @@
 
 #define BUFFER_SIZE 32 // 32 should be plenty for anything we are receiving
 
+// Different states for a signal to be in
+#define SIGNAL_BASE     = 1;  // 00000001
+#define SIGNAL_BLINK    = 2;  // 00000010
+#define SIGNAL_RED      = 4;  // 00000100
+#define SIGNAL_YELLOW   = 8;  // 00001000
+#define SIGNAL_GREEN    = 16; // 00010000
+#define SIGNAL_LAMP_ON  = 32; // 00100000
+#define SIGNAL_LAMP_OFF = 64; // 01000000
+
+/**
+ * SignalMessage struct for parsing signal messages
+ */
+typedef struct signalMessage {
+  char clientType;
+  boolean error;
+  char signalState;
+} SignalMessage;
+
 // network info
 byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x2C, 0x47};
 byte staticIp[] = {192, 168, 1, 150};
@@ -23,10 +41,14 @@ int serverPort = 19100;
 EthernetClient client;
 char readBuffer[BUFFER_SIZE];
 int readBufferPos;
+long prevTime;
 
 // prototypes
-boolean connectToServer();
-void printData(char* msg, int len);
+//boolean connectToServer();
+//void printData(char* msg, int len);
+//boolean isValidMessage(char* msg, int len);
+//SignalMessage* parseSignalMessage(char* msg, int len);
+
 
 /**
  * Setup initial 
@@ -43,12 +65,11 @@ void setup() {
   // allow ethernet setup to finish
   delay(1000);
   
-  Serial.println("Connected?");
-  
   connectToServer();
   
   // if dhcp, request that it be maintained
   //Ethernet.maintain();
+  prevTime = millis();
 }
 
 /**
@@ -80,6 +101,9 @@ boolean connectToServer() {
  * Main read/update loop
  */
 void loop() {
+  
+  long curTime = millis();
+  
   if(!client.connected()) {
     client.stop();
     if(!connectToServer()) {
@@ -91,7 +115,9 @@ void loop() {
     }
   }
   
-  if(client.connected()){
+  // wait for signal to switch for a bit before trying to read another (5 sec)
+  if(client.connected() && curTime - prevTime > 5000) {
+    prevTime = curTime;
     
     readBufferPos = 0;
     while((readBuffer[readBufferPos] = client.read()) != '\0' && readBufferPos < BUFFER_SIZE-1) {
@@ -102,10 +128,14 @@ void loop() {
     
     printData(readBuffer, readBufferPos);
     Serial.println();
+    
+    // parse the message and switch appropriate pins
+    SignalMessage* sm = parseSignalMessage(readBuffer, readBufferPosition);
+    if(sm != NULL) {
+      handleSignalMessage(sm);
+      delete sm;
+    }
   }
-  
-  // wait for signal to switch for a bit before trying to read another
-  delay(5000);
 }
 
 /**
@@ -121,5 +151,115 @@ void printData(char* msg, int len) {
     }
     Serial.write(msg[i]);
   }
+}
+
+/**
+ * Parse signal message and set appropriate pins
+ * @param sm A pointer to the signal message
+ */
+void handleSignalMessage(SignalMessage* sm) {
+  int state = (int)sm->signalState;
+  
+  // invalid code?
+  if(state & SIGNAL_BASE == 0) {
+    return;
+  }
+  
+  Serial.println("\n\n");
+  
+  // blink?
+  if((state & SIGNAL_BLINK > 0) {
+    Serial.println("Blinking");
+  }
+  
+  // signal color
+  if(state & SIGNAL_RED > 0) {
+    Serial.println("Red");
+  }
+  else if(state & SIGNAL_YELLOW > 0) {
+    Serial.println("Yellow");
+  }
+  else if(state & SIGNAL_GREEN > 0) {
+    Serial.println("Green");
+  }
+  
+  // lamp on or off
+  if(state & SIGNAL_LAMP_ON > 0) {
+    Serial.println("Turning lamp on...");
+  }
+  
+  if(state & SIGNAL_LAMP_OFF > 0) {
+    Serial.println("Turning lamp off...");
+  }
+}
+
+/**
+ * Determine if a given message loosely follows protocol
+ * @param msg The character array containing the message from a client
+ *            trying to write to the queue.
+ * @param len The length of the message
+ */
+boolean isValidMessage(char* msg, int len) {
+  if(msg == NULL) {
+    return false;
+  }
+
+  // make sure message is not too large
+  if(len > 32) {
+    return false;
+  }
+
+  // make sure message closing character is present
+  if(msg[len-1] == '\0') {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Parse message into SignalMessage struct
+ * @param msg The char array pointer from the client
+ * @param len The length of the message
+ * @return Pointer to a new SignalMessage
+ */
+SignalMessage* parseSignalMessage(char* msg, int len) {
+  if(!isValidMessage(msg, len)) {
+    return NULL;
+  }
+
+  SignalMessage* = new SignalMessage;
+
+  // init signal message
+  sm->clientType = 'X';
+  sm->error = false;
+  sm->signalState = 1;
+
+  char *tokSave;
+  char *token = strtok_r(msg, "|", &tokSave);
+  int elementNo = 0;
+
+  // fill struct by stepping through tokens (easy to keep default settings)
+  while(token != NULL) {
+    if(strlen(token) > 0) {
+      switch(elementNo) {
+        case 0:
+          sm->clientType = token[0];
+          break;
+
+        case 1:
+          sm->error = token[0]=='T'?true:false;
+          break;
+
+        case 2:
+          sm->signalState = token[0];
+          break;
+      }
+    }
+    elementNo++;
+    token = strtok_r(NULL, "|", &tokSave);
+  }
+
+  return sm;
 }
 
