@@ -14,13 +14,13 @@
 #define BUFFER_SIZE 32 // 32 should be plenty for anything we are receiving
 
 // Different states for a signal to be in
-#define SIGNAL_BASE     = 1;  // 00000001
-#define SIGNAL_BLINK    = 2;  // 00000010
-#define SIGNAL_RED      = 4;  // 00000100
-#define SIGNAL_YELLOW   = 8;  // 00001000
-#define SIGNAL_GREEN    = 16; // 00010000
-#define SIGNAL_LAMP_ON  = 32; // 00100000
-#define SIGNAL_LAMP_OFF = 64; // 01000000
+#define SIGNAL_BASE     1  // 00000001
+#define SIGNAL_BLINK    2  // 00000010
+#define SIGNAL_RED      4  // 00000100
+#define SIGNAL_YELLOW   8  // 00001000
+#define SIGNAL_GREEN    16 // 00010000
+#define SIGNAL_LAMP_ON  32 // 00100000
+#define SIGNAL_LAMP_OFF 64 // 01000000
 
 /**
  * SignalMessage struct for parsing signal messages
@@ -44,10 +44,11 @@ int readBufferPos;
 long prevTime;
 
 // prototypes
-//boolean connectToServer();
-//void printData(char* msg, int len);
-//boolean isValidMessage(char* msg, int len);
-//SignalMessage* parseSignalMessage(char* msg, int len);
+boolean connectToServer();
+void printData(char* msg, int len);
+boolean isValidMessage(char* msg, int len);
+SignalMessage* parseSignalMessage(char* msg, int len);
+void handleSignalMessage(void* smp);
 
 
 /**
@@ -130,7 +131,7 @@ void loop() {
     Serial.println();
     
     // parse the message and switch appropriate pins
-    SignalMessage* sm = parseSignalMessage(readBuffer, readBufferPosition);
+    SignalMessage* sm = parseSignalMessage(readBuffer, readBufferPos);
     if(sm != NULL) {
       handleSignalMessage(sm);
       delete sm;
@@ -155,9 +156,10 @@ void printData(char* msg, int len) {
 
 /**
  * Parse signal message and set appropriate pins
- * @param sm A pointer to the signal message
+ * @param smp A pointer to the signal message
  */
-void handleSignalMessage(SignalMessage* sm) {
+void handleSignalMessage(void* smp) {
+  SignalMessage* sm = (SignalMessage*)smp;
   int state = (int)sm->signalState;
   
   // invalid code?
@@ -168,7 +170,7 @@ void handleSignalMessage(SignalMessage* sm) {
   Serial.println("\n\n");
   
   // blink?
-  if((state & SIGNAL_BLINK > 0) {
+  if(state & SIGNAL_BLINK > 0) {
     Serial.println("Blinking");
   }
   
@@ -228,7 +230,7 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
     return NULL;
   }
 
-  SignalMessage* = new SignalMessage;
+  SignalMessage* sm = new SignalMessage;
 
   // init signal message
   sm->clientType = 'X';
