@@ -7,7 +7,7 @@
  * Protocol:
  *       Since there are a grand total of 8 possible things the signal
  *       can do, the message format will be simple:
- *       - R/W/X to specify client type
+ *       - R/W/S/X to specify client type (read, write, server, none)
  *       - '|' delimiter
  *       - T/F to indicate error
  *       - '|' delimiter
@@ -81,6 +81,8 @@ pthread_mutex_t signalQueueMutex;
 
 // prototypes
 void* handleClient(void* param);
+void handleReader(ThreadInfo* tInfo);
+void handleWriter(ThreadInfo* tInfo);
 int findAvailableWorker(ThreadInfo* workers, const int noWorkers);
 bool isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
@@ -131,6 +133,7 @@ int main(int argc, char* argv[]) {
     hints.ai_flags = AI_PASSIVE;
     hints.ai_protocol = 0;
 
+    // TODO: possibly set socket option SO_REUSEADDR so socket is available sooner (close does not immediately clean up)
     getaddrinfo(NULL, SERVER_PORT, &hints, &res);
     sockFd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     LISTENING_SOCKET = &sockFd;
@@ -173,14 +176,14 @@ int main(int argc, char* argv[]) {
         if(readyWorker < 0) {
             // if we failed, send error message
             //string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
-            string errorMsg = "X|T|1";
+            string errorMsg = "S|T|1";
             send(clientFd, errorMsg.c_str(), errorMsg.length()+1, 0);
             close(clientFd);
         }
         else {
             // if we succeeded, send initiation message
             //string welcomeMsg = "{\"error\":false}";
-            string welcomeMsg = "X|F|1";
+            string welcomeMsg = "S|F|1";
             send(clientFd, welcomeMsg.c_str(), welcomeMsg.length()+1, 0);
             
             // set a thread as connected and unlock mutex for that thread
@@ -193,9 +196,13 @@ int main(int argc, char* argv[]) {
     }
 
     // clean up everything
+    cout << "Waiting for threads to exit...\n";
+    cout.flush();
 
     // join threads
     for(i = 0; i < MAX_THREADS; i++) {
+        // unlock each thread's mutex
+        pthread_mutex_unlock(&threadInfoList[i].threadMutex);
         // close thread's connection
         if(threadInfoList[i].connected) {
             close(threadInfoList[i].socketFd);
@@ -251,67 +258,50 @@ void* handleClient(void* param) {
             // is the client going to be a reader or a writer?
             char* sig = new char[32];
             int size = recv(clientSoc, sig, 32, 0);
-            SignalMessage* msg = parseSignalMessage(sig, size);
-            char clientType = msg->clientType;
+            if(size < 1) {
+                cout << "Client disconnected before any useful information was sent.\n";
+            }
+            else {
+                SignalMessage* msg = parseSignalMessage(sig, size);
 
-cout << "Clien Type: " << msg->clientType << "\n";
-cout << "Error: " << msg->error << "\n";
-cout << "Signal State: " << msg->signalState << "\n";
+                if(msg == NULL) {
+                    cout << "Parsed message was NULL.\n";
+                }
+                else {
+                    char clientType = msg->clientType;
 
-            // clean up one-time use info
-            delete msg;
-            delete sig;
+                    cout << "Clien Type: " << msg->clientType << "\n";
+                    cout << "Error: " << msg->error << "\n";
+                    cout << "Signal State: " << msg->signalState << "\n";
 
-            if(clientType == 'R' || clientType == 'r') {
-    cout << "im a reader\n";
-                // client is a reader
-                sig = NULL; 
-                while(!signalQueue.empty() && size > 0) {
-                    // make sure I am the only thread modifying the queue
-                    pthread_mutex_lock(&signalQueueMutex);
-                    sig = signalQueue.front();
-                    signalQueue.pop();
-                    // done modifying the queue
-                    pthread_mutex_unlock(&signalQueueMutex);
-                    size = send(clientSoc, sig, strlen(sig)+1, 0);
-                    delete[] sig;
+                    // clean up one-time use info
+                    delete msg;
+                    delete sig;
 
-                    if(size < 1) {
-                        cout << "Client disconnected!\n";
+                    switch(clientType) {
+                        case 'R':
+                        case 'r':
+                            // client is a reader
+                            handleReader(tInfo);
+                            break;
+                        case 'W':
+                        case 'w':
+                            // client is a writer
+                            handleReader(tInfo);
+                            break;
+                        case 'X':
+                        case 'x':
+                            QUIT_FLAG = true;
+                            if(close(*LISTENING_SOCKET) < 0) {
+                                cout << "failed to close listening socket!\n";
+                                cout.flush();
+                            }
+                            break;
                     }
                 }
             }
-            else if(clientType == 'W' || clientType == 'w') {
-                // client is a writer
-    cout << "im a writer\n";
-                while(size > 0) {
-                    sig = new char[32];
-                    size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
-                    if(size > 0) {
-                        sig[size+1] = '\0';
-                        cout << sig << " " << strlen(sig);
-                    }
-                     // make sure I am the only thread modifying the queue
-                    pthread_mutex_lock(&signalQueueMutex);
 
-                    if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
-                        signalQueue.push(sig);
-                    }
-                    // done modifying the queue
-                    pthread_mutex_unlock(&signalQueueMutex);
-
-                }
-            }
-            else if(clientType == 'E' || clientType == 'e') {
-                QUIT_FLAG = true;
-                close(*LISTENING_SOCKET);
-            }
-
-    cout << "closing socket\n";
-            //stringstream msgStream;
-            //msgStream << "hello from thread " << myId;
-            //string msg = msgStream.str();
-
+            cout << "closing socket\n";
             close(clientSoc);
         }
         
@@ -322,6 +312,59 @@ cout << "Signal State: " << msg->signalState << "\n";
     cout.flush();
 }
 
+/**
+ * Handle a client that wants to read from the queue
+ * @param tInfo A pointer to the thread's ThreadInfo struct
+ */
+void handleReader(ThreadInfo* tInfo) {
+    char* sig = NULL;
+    int size = 0; 
+    int clientSoc = tInfo->socketFd;
+    while(!signalQueue.empty() && size > 0) {
+        // make sure I am the only thread modifying the queue
+        pthread_mutex_lock(&signalQueueMutex);
+        sig = signalQueue.front();
+        signalQueue.pop();
+        // done modifying the queue
+        pthread_mutex_unlock(&signalQueueMutex);
+        size = send(clientSoc, sig, strlen(sig)+1, 0);
+        delete[] sig;
+
+        if(size < 1) {
+            cout << "Client disconnected!\n";
+        }
+    }
+}
+
+/**
+ * Handle a client that wants to write to the queue
+ * @param tInfo A pointer to the thread's ThreadInfo struct
+ */
+void handleWriter(ThreadInfo* tInfo) {
+    char* sig = NULL; 
+    int size = 0; 
+    int clientSoc = tInfo->socketFd;
+    while(size > 0) {
+        sig = new char[32];
+        size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
+        if(size > 0) {
+            sig[size+1] = '\0';
+        }
+        else {
+            cout << "Client disconnected!\n";
+            break;
+        }
+
+        // make sure I am the only thread modifying the queue
+        pthread_mutex_lock(&signalQueueMutex);
+
+        if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
+            signalQueue.push(sig);
+        }
+        // done modifying the queue
+        pthread_mutex_unlock(&signalQueueMutex);
+    }
+}
 
 /**
  * Find a worker thread that is not busy. If none are available, return -1.
@@ -361,7 +404,7 @@ bool isValidMessage(char* msg, int len) {
     }
 
     // make sure message closing character is present
-    if(msg[len-1] == '\0') {
+    if(msg[len-1] != '\0') {
         return false;
     }
 
