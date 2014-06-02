@@ -287,7 +287,7 @@ void* handleClient(void* param) {
                         case 'W':
                         case 'w':
                             // client is a writer
-                            handleReader(tInfo);
+                            handleWriter(tInfo);
                             break;
                         case 'X':
                         case 'x':
@@ -320,7 +320,7 @@ void handleReader(ThreadInfo* tInfo) {
     char* sig = NULL;
     int size = 0; 
     int clientSoc = tInfo->socketFd;
-    while(!signalQueue.empty() && size > 0) {
+    while(!signalQueue.empty()) {
         // make sure I am the only thread modifying the queue
         pthread_mutex_lock(&signalQueueMutex);
         sig = signalQueue.front();
@@ -328,10 +328,12 @@ void handleReader(ThreadInfo* tInfo) {
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
         size = send(clientSoc, sig, strlen(sig)+1, 0);
+cout << "MESSAGE: " << sig << "\n";
         delete[] sig;
 
         if(size < 1) {
             cout << "Client disconnected!\n";
+            break;
         }
     }
 }
@@ -344,7 +346,8 @@ void handleWriter(ThreadInfo* tInfo) {
     char* sig = NULL; 
     int size = 0; 
     int clientSoc = tInfo->socketFd;
-    while(size > 0) {
+    int msgCount = 0;
+    while(tInfo->connected) {
         sig = new char[32];
         size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
         if(size > 0) {
@@ -359,11 +362,14 @@ void handleWriter(ThreadInfo* tInfo) {
         pthread_mutex_lock(&signalQueueMutex);
 
         if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
+            msgCount++;
             signalQueue.push(sig);
-        }
+cout << "MESSAGE: " << sig << "\n";
+        } else {cout << "no msg.......\n";}
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
     }
+cout << "Received: " << msgCount << "\n";
 }
 
 /**
