@@ -27,7 +27,6 @@
 
 
 #include <queue>
-#include <vector>
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -75,6 +74,7 @@ typedef struct signalMessage {
 } SignalMessage;
 
 bool QUIT_FLAG;
+int* LISTENING_SOCKET;
 queue<char*> signalQueue;
 pthread_mutex_t signalQueueMutex;
 
@@ -133,20 +133,33 @@ int main(int argc, char* argv[]) {
 
     getaddrinfo(NULL, SERVER_PORT, &hints, &res);
     sockFd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    LISTENING_SOCKET = &sockFd;
 
     if(sockFd < 0) {
-        cout << "Failed to create listening socket \n" << strerror(errno);
+        cout << "Failed to create listening socket: \n" << strerror(errno);
         exit(1);
     }
 
-    bind(sockFd, res->ai_addr, res->ai_addrlen);
-    listen(sockFd, SERVER_BACKLOG);
+    if(bind(sockFd, res->ai_addr, res->ai_addrlen) < 0) {
+        cout << "Failed to bind address to socket: \n" << strerror(errno);
+        exit(1);
+    }
+
+    if(listen(sockFd, SERVER_BACKLOG) < 0) {
+        cout << "Failed to listen on socket: \n" << strerror(errno);
+        exit(1);
+    }
 
     addrSize = sizeof(clientAddr);
 
     // main loop waits for a new connection and assigns to a thread if one is available
     while(!QUIT_FLAG) {
         clientFd = accept(sockFd, (struct sockaddr *)&clientAddr, &addrSize);
+        
+        // the loop will likely continue once before the flag is set
+        if(QUIT_FLAG) {
+            break;
+        }
 
         if(clientFd < 0) {
             cout << "Client did not connect successfully \n";
@@ -160,14 +173,14 @@ int main(int argc, char* argv[]) {
         if(readyWorker < 0) {
             // if we failed, send error message
             //string errorMsg = "{\"error\":true,\"code\":1,\"message\":\"No available connections.\"}";
-            string errorMsg = "1|T|X";
+            string errorMsg = "X|T|1";
             send(clientFd, errorMsg.c_str(), errorMsg.length()+1, 0);
             close(clientFd);
         }
         else {
             // if we succeeded, send initiation message
             //string welcomeMsg = "{\"error\":false}";
-            string welcomeMsg = "1|F|X";
+            string welcomeMsg = "X|F|1";
             send(clientFd, welcomeMsg.c_str(), welcomeMsg.length()+1, 0);
             
             // set a thread as connected and unlock mutex for that thread
@@ -179,12 +192,31 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // clean up everything
+
     // join threads
     for(i = 0; i < MAX_THREADS; i++) {
+        // close thread's connection
+        if(threadInfoList[i].connected) {
+            close(threadInfoList[i].socketFd);
+        }
+        // wait for thread to exit
         pthread_join(threadIds[i],NULL);
     }
 
-    // clean up
+    // empty out queue
+    char* tempSig;
+    while(!signalQueue.empty()) {
+        tempSig = signalQueue.front();
+        signalQueue.pop();
+        if(tempSig != NULL) {
+            delete tempSig;
+        }
+    }
+
+    // close listening socket
+    close(sockFd); // this should already be closed, but just in case...
+
     delete[] threadInfoList;
     delete[] threadIds;
 
@@ -269,6 +301,10 @@ cout << "Signal State: " << msg->signalState << "\n";
                     pthread_mutex_unlock(&signalQueueMutex);
 
                 }
+            }
+            else if(clientType == 'E' || clientType == 'e') {
+                QUIT_FLAG = true;
+                close(*LISTENING_SOCKET);
             }
 
     cout << "closing socket\n";
@@ -377,29 +413,4 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
 
     return sm;
 }
-
-/**
- * Split a string into a vector of substrings based on a delimiter
- * @param rawInput The input string to process
- * @param delimiter The character to split on
- * @return A vector containing the split string
- */
-/*vector<string*>* stringSplit(string rawInput, char delimiter) {
-    if(rawInput == NULL) {
-        return NULL;
-    }
-
-    int pos = 0;
-    int start = 0;
-
-    vector<string*>* subStrings = new vector<string*>;
-    while(pos != -1) {
-        start = pos;
-        pos = rawInput.find_first_of('|',delimiter);
-        subStrings->push_back(new string(rawInput, start, pos-start));
-        pos++;
-    }
-
-    return subStrings;
-}*/
 
