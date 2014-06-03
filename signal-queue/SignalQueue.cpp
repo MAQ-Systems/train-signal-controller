@@ -364,7 +364,7 @@ void handleWriter(ThreadInfo* tInfo) {
         if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
             msgCount++;
             signalQueue.push(sig);
-cout << "MESSAGE: " << sig << "\n";
+cout << "MESSAGE: " << sig << "\nSIZE: " << size << "\n";
         } else {cout << "no msg.......\n";}
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
