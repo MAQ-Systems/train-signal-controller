@@ -61,6 +61,9 @@ typedef struct threadInfo {
     bool connected; // If the worker is actuall in use
     int socketFd;   // The ID of the socket to write to
     pthread_mutex_t threadMutex; // used to stop and start particular a thread (will block via spinlock or sleeping)
+    char* readBuff; // Where information is stored that has not been parsed yet
+    int readBuffContentLen; // How much stuff is in the current readBuff
+    int readBuffPos; // The current position inside the readBuff
 } ThreadInfo;
 
 /**
@@ -113,6 +116,10 @@ int main(int argc, char* argv[]) {
         threadInfoList[i].workerId = i;
         threadInfoList[i].connected = false;
         
+        threadInfoList[i].readBuff = new char[32];
+        threadInfoList[i].readBuffContentLen = 0;
+        threadInfoList[i].readBuffPos = 0;
+
         pthread_mutex_init(&threadInfoList[i].threadMutex,NULL);
         pthread_mutex_lock(&threadInfoList[i].threadMutex);
 
@@ -209,6 +216,7 @@ int main(int argc, char* argv[]) {
         }
         // wait for thread to exit
         pthread_join(threadIds[i],NULL);
+        delete[] threadInfoList[i].readBuff;
     }
 
     // empty out queue
@@ -347,6 +355,11 @@ void handleWriter(ThreadInfo* tInfo) {
     int size = 0; 
     int clientSoc = tInfo->socketFd;
     int msgCount = 0;
+
+    // reset the read buffer for this connection
+    tInfo->readBuffContentLen = 0;
+    tInfo->readBuffPos = 0;
+
     while(tInfo->connected) {
         sig = new char[32];
         size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
@@ -370,6 +383,23 @@ cout << "MESSAGE: " << sig << "\nSIZE: " << size << "\n";
         pthread_mutex_unlock(&signalQueueMutex);
     }
 cout << "Received: " << msgCount << "\n";
+}
+
+/**
+ * Get a message from a particular thread's stream
+ * @param tInfo A pointer to the thread's ThreadInfo struct
+ */
+char* getMessageFromStream(ThreadInfo* tInfo) {
+    char* msg = new char[32];
+    while() {
+        // if we have nothing more in our buffer, fill it up
+        if(tInfo->readBuffContentLen == tInfo->readBuffPos) {
+            size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
+            if(size > 0) {
+                sig[size+1] = '\0';
+            }
+        }
+    }
 }
 
 /**
