@@ -86,6 +86,7 @@ pthread_mutex_t signalQueueMutex;
 void* handleClient(void* param);
 void handleReader(ThreadInfo* tInfo);
 void handleWriter(ThreadInfo* tInfo);
+char* getMessageFromStream(ThreadInfo* tInfo);
 int findAvailableWorker(ThreadInfo* workers, const int noWorkers);
 bool isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
@@ -361,13 +362,9 @@ void handleWriter(ThreadInfo* tInfo) {
     tInfo->readBuffPos = 0;
 
     while(tInfo->connected) {
-        sig = new char[32];
-        size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
-        if(size > 0) {
-            sig[size+1] = '\0';
-        }
-        else {
-            cout << "Client disconnected!\n";
+        sig = getMessageFromStream(tInfo);
+
+        if(sig == NULL) {
             break;
         }
 
@@ -386,20 +383,48 @@ cout << "Received: " << msgCount << "\n";
 }
 
 /**
- * Get a message from a particular thread's stream
+ * Get a message from a particular thread's stream. Returned message will
+ * either be null or null-terminated.
  * @param tInfo A pointer to the thread's ThreadInfo struct
  */
 char* getMessageFromStream(ThreadInfo* tInfo) {
     char* msg = new char[32];
-    while() {
+    int pos = 0;
+    bool emptyRead = false;
+    int size = 0;
+    while(pos >= 32) {
         // if we have nothing more in our buffer, fill it up
         if(tInfo->readBuffContentLen == tInfo->readBuffPos) {
-            size = recv(clientSoc, sig, 31, 0); // leave space for null terminator
-            if(size > 0) {
-                sig[size+1] = '\0';
+            size = recv(tInfo->socketFd, tInfo->readBuff, 31, 0); // leave space for null terminator
+            // no more to read?
+            if(size < 1) {
+                emptyRead = true;
+                cout << "Client disconnected!\n";
             }
         }
+
+        // end of a single message?
+        if(emptyRead || tInfo->readBuff[tInfo->readBuffPos] == '\0') {
+            break;
+        }
+
+        // copy char and increment position trackers
+        msg[pos] = tInfo->readBuff[tInfo->readBuffPos];
+        pos++;
+        tInfo->readBuffPos++;
     }
+
+    // make sure null terminator is last char
+    if(msg[pos] != '\0') {
+        if(pos < 31) {
+            msg[pos+1] = '\0';
+        }
+        else {
+            msg[32] = '\0';
+        }
+    }
+
+    return msg;
 }
 
 /**
