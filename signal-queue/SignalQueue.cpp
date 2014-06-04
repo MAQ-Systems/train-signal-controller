@@ -310,7 +310,7 @@ void* handleClient(void* param) {
                 }
             }
 
-            cout << "closing socket\n";
+            cout << "closing socket\n\n\n\n\n";
             close(clientSoc);
         }
         
@@ -374,12 +374,11 @@ void handleWriter(ThreadInfo* tInfo) {
         if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
             msgCount++;
             signalQueue.push(sig);
-cout << "MESSAGE: " << sig << "\nSIZE: " << size << "\n";
-        } else {cout << "no msg.......\n";}
+            cout << "MESSAGE: " << sig << "\nSIZE: " << size << "\n";
+        }
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
     }
-cout << "Received: " << msgCount << "\n";
 }
 
 /**
@@ -391,20 +390,30 @@ char* getMessageFromStream(ThreadInfo* tInfo) {
     char* msg = new char[32];
     int pos = 0;
     bool emptyRead = false;
-    int size = 0;
-    while(pos >= 32) {
+    while(pos < 32) {
         // if we have nothing more in our buffer, fill it up
         if(tInfo->readBuffContentLen == tInfo->readBuffPos) {
-            size = recv(tInfo->socketFd, tInfo->readBuff, 31, 0); // leave space for null terminator
+            tInfo->readBuffContentLen = recv(tInfo->socketFd, tInfo->readBuff, 31, 0); // leave space for null terminator
+            tInfo->readBuffPos = 0;
             // no more to read?
-            if(size < 1) {
+            if(tInfo->readBuffContentLen < 1) {
                 emptyRead = true;
                 cout << "Client disconnected!\n";
+                tInfo->connected = false;
+
+                if(pos == 0) {
+                    delete[] msg;
+                    return NULL;
+                }
+            }
+            else {
+                cout << "INCOMING BUFF: " << tInfo->readBuff << " SIZE: " << tInfo->readBuffContentLen << "\n";
             }
         }
 
         // end of a single message?
         if(emptyRead || tInfo->readBuff[tInfo->readBuffPos] == '\0') {
+            tInfo->readBuffPos++;
             break;
         }
 
@@ -420,7 +429,7 @@ char* getMessageFromStream(ThreadInfo* tInfo) {
             msg[pos+1] = '\0';
         }
         else {
-            msg[32] = '\0';
+            msg[31] = '\0';
         }
     }
 
