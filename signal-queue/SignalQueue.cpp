@@ -353,7 +353,6 @@ cout << "MESSAGE: " << sig << "\n";
  */
 void handleWriter(ThreadInfo* tInfo) {
     char* sig = NULL; 
-    int size = 0; 
     int clientSoc = tInfo->socketFd;
     int msgCount = 0;
 
@@ -371,10 +370,10 @@ void handleWriter(ThreadInfo* tInfo) {
         // make sure I am the only thread modifying the queue
         pthread_mutex_lock(&signalQueueMutex);
 
-        if(signalQueue.size() < 50 && isValidMessage(sig,size)) {
+        if(signalQueue.size() < 50 && isValidMessage(sig,strlen(sig))) {
             msgCount++;
             signalQueue.push(sig);
-            cout << "MESSAGE: " << sig << "\nSIZE: " << size << "\n";
+            cout << "MESSAGE: " << sig << "\nSIZE: " << strlen(sig) << "\n";
         }
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
