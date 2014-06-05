@@ -97,13 +97,6 @@ SignalMessage* parseSignalMessage(char* msg, int len);
  */
 int main(int argc, char* argv[]) {
 
-    // TODO: Remove this test data
-    char* temp = new char[10];
-    char data[] = "TESTDATA\0";
-    memcpy(temp,data,strlen(data)+1);
-    signalQueue.push(temp);
-
-
     int i;
     QUIT_FLAG = false;
 
@@ -252,7 +245,11 @@ void* handleClient(void* param) {
     ThreadInfo* tInfo = (ThreadInfo*)param;   
 
     int myId = tInfo->workerId;
- 
+
+    // reset the read buffer for this connection
+    tInfo->readBuffContentLen = 0;
+    tInfo->readBuffPos = 0;
+
     // perpetually try to work
     while(!QUIT_FLAG) {
 
@@ -265,13 +262,12 @@ void* handleClient(void* param) {
         if(tInfo->connected) {
 
             // is the client going to be a reader or a writer?
-            char* sig = new char[32];
-            int size = recv(clientSoc, sig, 32, 0);
-            if(size < 1) {
+            char* sig = getMessageFromStream(tInfo);
+            if(sig == NULL) {
                 cout << "Client disconnected before any useful information was sent.\n";
             }
             else {
-                SignalMessage* msg = parseSignalMessage(sig, size);
+                SignalMessage* msg = parseSignalMessage(sig, strlen(sig)+1);
 
                 if(msg == NULL) {
                     cout << "Parsed message was NULL.\n";
@@ -310,7 +306,7 @@ void* handleClient(void* param) {
                 }
             }
 
-            cout << "closing socket\n\n\n\n\n";
+            cout << "closing socket\n";
             close(clientSoc);
         }
         
@@ -356,10 +352,6 @@ void handleWriter(ThreadInfo* tInfo) {
     int clientSoc = tInfo->socketFd;
     int msgCount = 0;
 
-    // reset the read buffer for this connection
-    tInfo->readBuffContentLen = 0;
-    tInfo->readBuffPos = 0;
-
     while(tInfo->connected) {
         sig = getMessageFromStream(tInfo);
 
@@ -370,7 +362,7 @@ void handleWriter(ThreadInfo* tInfo) {
         // make sure I am the only thread modifying the queue
         pthread_mutex_lock(&signalQueueMutex);
 
-        if(signalQueue.size() < 50 && isValidMessage(sig,strlen(sig))) {
+        if(signalQueue.size() < 50 && isValidMessage(sig,strlen(sig)+1)) {
             msgCount++;
             signalQueue.push(sig);
             cout << "MESSAGE: " << sig << "\nSIZE: " << strlen(sig) << "\n";
@@ -404,9 +396,6 @@ char* getMessageFromStream(ThreadInfo* tInfo) {
                     delete[] msg;
                     return NULL;
                 }
-            }
-            else {
-                cout << "INCOMING BUFF: " << tInfo->readBuff << " SIZE: " << tInfo->readBuffContentLen << "\n";
             }
         }
 
