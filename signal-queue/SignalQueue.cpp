@@ -333,7 +333,7 @@ void handleReader(ThreadInfo* tInfo) {
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
         size = send(clientSoc, sig, strlen(sig)+1, 0);
-cout << "MESSAGE: " << sig << "\n";
+cout << "MESSAGE: " << sig << "\nSIZE: " << size << " " << strlen(sig) << "\n";
         delete[] sig;
 
         if(size < 1) {
@@ -457,7 +457,7 @@ bool isValidMessage(char* msg, int len) {
     }
 
     // make sure message is not too large
-    if(len > 32) {
+    if(len > 32 || len <= 1) {
         return false;
     }
 
