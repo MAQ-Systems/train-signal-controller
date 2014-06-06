@@ -140,17 +140,17 @@ int main(int argc, char* argv[]) {
     LISTENING_SOCKET = &sockFd;
 
     if(sockFd < 0) {
-        cout << "Failed to create listening socket: \n" << strerror(errno);
+        cout << "SignalController: Failed to create listening socket: \n" << strerror(errno);
         exit(1);
     }
 
     if(bind(sockFd, res->ai_addr, res->ai_addrlen) < 0) {
-        cout << "Failed to bind address to socket: \n" << strerror(errno);
+        cout << "SignalController: Failed to bind address to socket: \n" << strerror(errno);
         exit(1);
     }
 
     if(listen(sockFd, SERVER_BACKLOG) < 0) {
-        cout << "Failed to listen on socket: \n" << strerror(errno);
+        cout << "SignalController: Failed to listen on socket: \n" << strerror(errno);
         exit(1);
     }
 
@@ -166,10 +166,10 @@ int main(int argc, char* argv[]) {
         }
 
         if(clientFd < 0) {
-            cout << "Client did not connect successfully \n";
+            cout << "SignalController: Client did not connect successfully! \n";
         }
         else {
-            cout << "A client connected! \n";
+            cout << "SignalController: A client connected! \n";
         }
 
         // find available worker and assign
@@ -197,7 +197,7 @@ int main(int argc, char* argv[]) {
     }
 
     // clean up everything
-    cout << "Waiting for threads to exit...\n";
+    cout << "SignalController: Waiting for threads to exit...\n";
     cout.flush();
 
     // join threads
@@ -229,12 +229,10 @@ int main(int argc, char* argv[]) {
     delete[] threadInfoList;
     delete[] threadIds;
 
-    cout << "Server exiting...\n";
+    cout << "SignalController: Server exiting...\n";
 
     return 0;
 }
-
-
 
 /**
  * Client handler that each thread will run
@@ -256,7 +254,7 @@ void* handleClient(void* param) {
         // wait for master to unlock this thread
         pthread_mutex_lock(&tInfo->threadMutex);
 
-        cout << "Client connected to thread " << myId << "\n";
+        cout << "SignalController: Client connected to thread " << myId << "!\n";
         int clientSoc = tInfo->socketFd;
 
         if(tInfo->connected) {
@@ -264,20 +262,20 @@ void* handleClient(void* param) {
             // is the client going to be a reader or a writer?
             char* sig = getMessageFromStream(tInfo);
             if(sig == NULL) {
-                cout << "Client disconnected before any useful information was sent.\n";
+                cout << "SignalController: Client disconnected before any useful information was sent.\n";
             }
             else {
                 SignalMessage* msg = parseSignalMessage(sig, strlen(sig)+1);
 
                 if(msg == NULL) {
-                    cout << "Parsed message was NULL.\n";
+                    cout << "SignalController: Parsed message was NULL.\n";
                 }
                 else {
                     char clientType = msg->clientType;
 
-                    cout << "Clien Type: " << msg->clientType << "\n";
-                    cout << "Error: " << msg->error << "\n";
-                    cout << "Signal State: " << msg->signalState << "\n";
+                    cout << "    Clien Type: " << msg->clientType << "\n";
+                    cout << "    Error: " << msg->error << "\n";
+                    cout << "    Signal State: " << msg->signalState << "\n";
 
                     // clean up one-time use info
                     delete msg;
@@ -298,7 +296,7 @@ void* handleClient(void* param) {
                         case 'x':
                             QUIT_FLAG = true;
                             if(close(*LISTENING_SOCKET) < 0) {
-                                cout << "failed to close listening socket!\n";
+                                cout << "SignalController: Failed to close listening socket!\n";
                                 cout.flush();
                             }
                             break;
@@ -306,39 +304,51 @@ void* handleClient(void* param) {
                 }
             }
 
-            cout << "closing socket\n";
+            cout << "SignalController: Closing socket...\n\n";
             close(clientSoc);
         }
         
         tInfo->connected = false;
     }
 
-    cout << "Exiting thread " << myId << "\n";
+    cout << "SignalController: Exiting thread " << myId << "...\n";
     cout.flush();
 }
 
 /**
- * Handle a client that wants to read from the queue
+ * Handle a client that wants to read from the queue. Do not
+ * disconnect if the signal queue is empty; clients are the 
+ * only ones that should initiate a disconnect.
  * @param tInfo A pointer to the thread's ThreadInfo struct
  */
 void handleReader(ThreadInfo* tInfo) {
     char* sig = NULL;
     int size = 0; 
     int clientSoc = tInfo->socketFd;
-    while(!signalQueue.empty()) {
+    while(true) {
         // make sure I am the only thread modifying the queue
         pthread_mutex_lock(&signalQueueMutex);
-        sig = signalQueue.front();
-        signalQueue.pop();
-        // done modifying the queue
-        pthread_mutex_unlock(&signalQueueMutex);
-        size = send(clientSoc, sig, strlen(sig)+1, 0);
-cout << "MESSAGE: " << sig << "\nSIZE: " << size << " " << strlen(sig) << "\n";
-        delete[] sig;
 
-        if(size < 1) {
-            cout << "Client disconnected!\n";
-            break;
+        if(signalQueue.empty()) {
+            // done modifying the queue
+            pthread_mutex_unlock(&signalQueueMutex);
+            // TODO: possible lock cond var
+        }
+        else {
+            sig = signalQueue.front();
+            // done modifying the queue
+            pthread_mutex_unlock(&signalQueueMutex);
+
+            size = send(clientSoc, sig, strlen(sig)+1, 0);
+
+            // only remove from queue if the message was sent
+            if(size < 1) {
+                cout << "SignalController: Client disconnected!\n";
+            }
+            else {
+                delete[] sig;
+                signalQueue.pop();
+            }
         }
     }
 }
@@ -365,7 +375,6 @@ void handleWriter(ThreadInfo* tInfo) {
         if(signalQueue.size() < 50 && isValidMessage(sig,strlen(sig)+1)) {
             msgCount++;
             signalQueue.push(sig);
-            cout << "MESSAGE: " << sig << "\nSIZE: " << strlen(sig) << "\n";
         }
         // done modifying the queue
         pthread_mutex_unlock(&signalQueueMutex);
@@ -389,7 +398,7 @@ char* getMessageFromStream(ThreadInfo* tInfo) {
             // no more to read?
             if(tInfo->readBuffContentLen < 1) {
                 emptyRead = true;
-                cout << "Client disconnected!\n";
+                cout << "SignalController: Client disconnected!\n";
                 tInfo->connected = false;
 
                 if(pos == 0) {
@@ -414,7 +423,7 @@ char* getMessageFromStream(ThreadInfo* tInfo) {
     // make sure null terminator is last char
     if(msg[pos] != '\0') {
         if(pos < 31) {
-            msg[pos+1] = '\0';
+            msg[pos] = '\0';
         }
         else {
             msg[31] = '\0';
