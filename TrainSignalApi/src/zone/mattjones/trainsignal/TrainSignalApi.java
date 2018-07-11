@@ -8,8 +8,6 @@
 package zone.mattjones.trainsignal;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 
@@ -19,6 +17,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import zone.mattjones.trainsignal.TrainSignalMessage.LampState;
+import zone.mattjones.trainsignal.TrainSignalMessage.SignalColor;
+
 public class TrainSignalApi extends HttpServlet {
 	
 	private static final long serialVersionUID = 06012014L;
@@ -27,55 +28,57 @@ public class TrainSignalApi extends HttpServlet {
     private static final String serverIp = "24.15.183.66";
     private static final int serverPort = 19100;
 	
-	public static void main(String[] args) {
-		Socket soc = connectToQueue(serverIp, serverPort);
-		try {
-			InputStream is = soc.getInputStream();
-			OutputStream os = soc.getOutputStream();
-			
-			byte[] buff = new byte[32];
-			
-			int size = is.read(buff);
-			for(int i = 0; i < size; i++) {
-				System.out.print((char)buff[i]);
-			}
-			
-			os.write("R|F|1\0".getBytes());
-			
-			
-			
-/*			os.write("W|F|2\0".getBytes());
-			os.write("W|F|3\0".getBytes());
-			os.flush();
-			os.close();
-*/			
-			
-			
-			while((size = is.read(buff)) > 0) {
-				for(int i = 0; i < size; i++) {
-					System.out.print((char)buff[i]);
-				}
-			}
-		}
-		catch(Exception ex) {
-			
-		}
-	}
-	
 	@Override
     public void init(ServletConfig config) {
 		
     }
 
 	@Override
-	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
 		// Read input from the params in the URL.
-		String color = request.getParameter("color");
-		String blink = request.getParameter("blink");
-		String on = request.getParameter("on");
+		String colorString = request.getParameter("color");
+		SignalColor color = SignalColor.RED;
+		if (colorString != null) {
+			switch(colorString.charAt(0)) {
+				case 'R':
+				case 'r':
+					color = SignalColor.RED;
+					break;
+				case 'Y':
+				case 'y':
+					color = SignalColor.YELLOW;
+					break;
+				case 'G':
+				case 'g':
+					color = SignalColor.GREEN;
+					break;
+			}
+		}
 		
+		String lampString = request.getParameter("lamp");
+		LampState lamp = LampState.OFF;
+		if (lampString != null) {
+			switch(lampString.charAt(0)) {
+				case '1':
+					lamp = LampState.ON;
+					break;
+				case '0':
+					lamp = LampState.OFF;
+					break;
+				case 'B':
+				case 'b':
+					lamp = LampState.BLINK;
+					break;
+			}
+		}
 		
-		response.getWriter().append("{\"code\": 0, \"message\":\"success\"}");
+		byte[] signalMessage = TrainSignalMessage.generateMessage(color, lamp);
+		
+		String messageString = new String(signalMessage);
+		response.getWriter().append("{\"currentState\":\"" + messageString + "\"}");
+		response.getWriter().flush();
+		response.getWriter().close();
 	}
 	
 	/**

@@ -17,7 +17,7 @@
  *           - [5] turn lamp on
  *           - [6] turn lamp off
  *           - [7] unused
- *       - '\0' to close the message
+ *       - '!' to close the message
  * Reserved Chars:
  *      '[', ']', '|', '\0'
  */
@@ -26,7 +26,7 @@ package zone.mattjones.trainsignal;
 
 public class TrainSignalMessage {
 	/** Possible colors that the signal can be. */
-	public enum Color {
+	public enum SignalColor {
 		RED,
 		YELLOW,
 		GREEN
@@ -49,7 +49,7 @@ public class TrainSignalMessage {
 	private static final int SIGNAL_LAMP_OFF= 64; // 01000000
 	
 	/** The character all messages should end with. */
-	private static final char MESSAGE_TERMINATING_CHAR = '\0';
+	private static final char MESSAGE_TERMINATING_CHAR = '!';
 	
 	/** Private constructor to prevent instantiation. */
 	private TrainSignalMessage() {}
@@ -61,7 +61,7 @@ public class TrainSignalMessage {
 	 * @param lampState The state of the lamp (on/off/blink).
 	 * @return A message byte array.
 	 */
-	public static byte[] generateMessage(Color signalColor, LampState lampState) {
+	public static byte[] generateMessage(SignalColor signalColor, LampState lampState) {
 		byte signalState = SIGNAL_BASE;
 		
 		switch(signalColor) {
