@@ -5,7 +5,7 @@
  * Desc: REST API for communicating with server program that controls the train signal.
  */
 
-package com.iotitan.trainsignal;
+package zone.mattjones.trainsignal;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,7 +18,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 
 public class TrainSignalApi extends HttpServlet {
 	
@@ -79,7 +78,13 @@ public class TrainSignalApi extends HttpServlet {
 
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		// Read input from the params in the URL.
+		String color = request.getParameter("color");
+		String blink = request.getParameter("blink");
+		String on = request.getParameter("on");
 		
+		
+		response.getWriter().append("{\"code\": 0, \"message\":\"success\"}");
 	}
 	
 	/**

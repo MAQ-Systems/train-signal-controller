@@ -8,7 +8,7 @@
 	
 	<servlet>
 		<servlet-name>Train Signal API</servlet-name>
-		<servlet-class>com.iotitan.trainsignal.TrainSignalApi</servlet-class>
+		<servlet-class>zone.mattjones.trainsignal.TrainSignalApi</servlet-class>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>Train Signal API</servlet-name>
