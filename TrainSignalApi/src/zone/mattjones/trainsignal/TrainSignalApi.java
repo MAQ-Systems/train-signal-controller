@@ -26,15 +26,6 @@ public class TrainSignalApi extends HttpServlet {
     //private static final String serverIp = "127.0.0.1";
     private static final String serverIp = "24.15.183.66";
     private static final int serverPort = 19100;
-    
-    // Different states for a signal to be in
-    public static final int SIGNAL_BASE    = 1;  // 00000001
-	public static final int SIGNAL_BLINK   = 2;  // 00000010
-	public static final int SIGNAL_RED     = 4;  // 00000100
-	public static final int SIGNAL_YELLOW  = 8;  // 00001000
-	public static final int SIGNAL_GREEN   = 16; // 00010000
-	public static final int SIGNAL_LAMP_ON = 32; // 00100000
-	public static final int SIGNAL_LAMP_OFF= 64; // 01000000
 	
 	public static void main(String[] args) {
 		Socket soc = connectToQueue(serverIp, serverPort);
