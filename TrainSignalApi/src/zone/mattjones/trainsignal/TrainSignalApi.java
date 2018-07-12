@@ -8,7 +8,6 @@
 package zone.mattjones.trainsignal;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.Socket;
 
 import javax.servlet.ServletConfig;
@@ -21,17 +20,23 @@ import zone.mattjones.trainsignal.TrainSignalMessage.LampState;
 import zone.mattjones.trainsignal.TrainSignalMessage.SignalColor;
 
 public class TrainSignalApi extends HttpServlet {
-	
 	private static final long serialVersionUID = 06012014L;
-    private static Socket queueCon;
-    //private static final String serverIp = "127.0.0.1";
-    private static final String serverIp = "24.15.183.66";
-    private static final int serverPort = 19100;
+
+	/** The port for the connection to the train signal to run on. */
+    private static final int SERVER_PORT = 19100;
 	
-	@Override
-    public void init(ServletConfig config) {
-		
+	/** The thread handling connections to the train signal. */
+	private TrainSignalConnectionHandler mConnectionHandler;
+	
+    /**
+     * Constructor that sets up the server socket listener for the arduino to connect to.
+     */
+    public TrainSignalApi() {
+    	mConnectionHandler = new TrainSignalConnectionHandler(SERVER_PORT);
     }
+    
+	@Override
+    public void init(ServletConfig config) {}
 
 	@Override
 	protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -74,29 +79,11 @@ public class TrainSignalApi extends HttpServlet {
 		}
 		
 		byte[] signalMessage = TrainSignalMessage.generateMessage(color, lamp);
+		mConnectionHandler.addMessage(signalMessage);
 		
 		String messageString = new String(signalMessage);
 		response.getWriter().append("{\"currentState\":\"" + messageString + "\"}");
 		response.getWriter().flush();
 		response.getWriter().close();
 	}
-	
-	/**
-	 * Connect to the signal queue
-	 * @param sIp The server's IP address in the form of a 4 element byte array
-	 * @param sPort The server's port
-	 */
-	private static synchronized Socket connectToQueue(String sIp, int sPort) {
-		Socket con = null;
-		try {
-			con = new Socket(InetAddress.getByName(sIp),sPort);
-		}
-		catch(Exception ex) {
-			// TODO: logger error
-			System.out.println(ex.getMessage());
-		}
-		return con;
-	}
-	
-	
 }
