@@ -99,8 +99,8 @@ public class TrainSignalConnectionHandler extends Thread {
 	 * @throws IOException
 	 */
 	public void resetServer() throws IOException {
-		if (mServerSocket == null) return;
-		mServerSocket.close();
+		if (mServerSocket != null) mServerSocket.close();
+		if (mActiveClientSocket != null) mActiveClientSocket.close();
 	}
 	
 	/**

@@ -78,6 +78,20 @@ public class TrainSignalApi extends HttpServlet {
 			}
 		}
 		
+		String serverActionString = request.getParameter("serverAction");
+		if (serverActionString != null) {
+			switch(serverActionString.charAt(0)) {
+			case 'X':
+			case 'x':
+				mConnectionHandler.killServer();
+				break;
+			case 'R':
+			case 'r':
+				mConnectionHandler.resetServer();
+				break;
+			}
+		}
+		
 		byte[] signalMessage = TrainSignalMessage.generateMessage(color, lamp);
 		mConnectionHandler.addMessage(signalMessage);
 		
