@@ -24,9 +24,9 @@
 
 #define MESSAGE_TERMINATING_CHAR '!'
 
-#define GREEN_PIN 13
-#define YELLOW_PIN 12
-#define RED_PIN 11
+#define GREEN_PIN 5
+#define YELLOW_PIN 6
+#define RED_PIN 7
 
 typedef enum {
   RED = 0,
