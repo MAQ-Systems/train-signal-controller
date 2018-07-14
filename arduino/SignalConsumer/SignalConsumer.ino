@@ -74,14 +74,19 @@ void handleSignalMessage(void* smp);
 void setup() {
   Serial.begin(9600);
   
-  // try to get connection through dhcp
+  // Try to get connection through dhcp.
   if(Ethernet.begin(mac) == 0) {
+    Serial.println("Failed DHCP using static IP.");
     // if dhcp didn't work, use static
     Ethernet.begin(mac, staticIp);
+    // Allow ethernet setup to finish.
+    delay(1000);
+  } else {
+    // Allow ethernet setup to finish.
+    delay(1000);
+    // If dhcp, request that it be maintained.
+    Ethernet.maintain();
   }
-  
-  // allow ethernet setup to finish
-  delay(1000);
   
   connectToServer();
 
@@ -90,9 +95,6 @@ void setup() {
   } else {
     Serial.println("Initial connection failed!");
   }
-  
-  // if dhcp, request that it be maintained
-  //Ethernet.maintain();
 
   pinMode(RED_PIN, OUTPUT);
   pinMode(YELLOW_PIN, OUTPUT);
