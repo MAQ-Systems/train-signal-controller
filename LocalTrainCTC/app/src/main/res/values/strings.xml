@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Local Train CTC</string>
+    <string name="signal_state_title_text">Signal State:</string>
+    <string name="signal_enabled_title_text">Signal Enabled:</string>
+</resources>
