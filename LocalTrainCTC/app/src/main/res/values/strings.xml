@@ -1,5 +1,9 @@
 <resources>
     <string name="app_name">Local Train CTC</string>
+    <string name="settings_dialog_title">Settings</string>
+    <string name="settings_dialog_url">Host URL:</string>
+    <string name="settings_ok">OK</string>
+    <string name="settings_cancel">CANCEL</string>
     <string name="signal_state_title_text">Signal State:</string>
     <string name="signal_enabled_title_text">Signal Enabled:</string>
 </resources>

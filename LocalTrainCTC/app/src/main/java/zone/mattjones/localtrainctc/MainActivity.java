@@ -8,10 +8,13 @@
 package zone.mattjones.localtrainctc;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.view.View;
+import android.widget.EditText;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -56,16 +59,26 @@ public class MainActivity extends Activity implements View.OnClickListener{
         mSignalButtons.add((SignalColorButton) findViewById(R.id.button_red));
         mSignalButtons.add((SignalColorButton) findViewById(R.id.button_red_blink));
 
+        findViewById(R.id.settings_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                openSettingsDialog();
+            }
+        });
+
         for (SignalColorButton button : mSignalButtons) {
             button.setOnClickListener(this);
         }
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        if (prefs.contains(API_URL_PREF_STRING)) {
+        if (!prefs.contains(API_URL_PREF_STRING)) {
+            disableButtons();
 
+            // If the user hasn't set a host, open settings to prompt them.
+            openSettingsDialog();
+        } else {
+            enableButtons();
         }
-
-        enableButtons();
     }
 
     @Override
@@ -112,6 +125,45 @@ public class MainActivity extends Activity implements View.OnClickListener{
      */
     private void enableButtons() {
         for (SignalColorButton button : mSignalButtons) button.setEnabled(true);
+    }
+
+    /**
+     * Open the popup containing settings.
+     */
+    private void openSettingsDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+
+        final View layout = getLayoutInflater().inflate(R.layout.dialog_settings, null);
+        final EditText urlField = layout.findViewById(R.id.host_url);
+
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        if (prefs.contains(API_URL_PREF_STRING)) {
+            // Pre-fill the UI if a URL already exists.
+            urlField.setText(prefs.getString(API_URL_PREF_STRING, ""));
+        }
+
+        builder.setView(layout);
+        builder.setTitle(R.string.settings_dialog_title);
+        builder.setPositiveButton(R.string.settings_ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                String url = urlField.getText().toString();
+                prefs.edit().putString(API_URL_PREF_STRING, url).apply();
+                mApiUrl = url;
+                dialogInterface.dismiss();
+
+                // TODO(Matt): The server should support a ping to check that it is valid before
+                // enabling the buttons for the UI.
+                enableButtons();
+            }
+        });
+        builder.setNegativeButton(R.string.settings_cancel, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                dialogInterface.dismiss();
+            }
+        });
+        builder.create().show();
     }
 
     private URI produceApiUri(SignalColor color, LampState state) {
