@@ -6,4 +6,5 @@
     <string name="settings_cancel">CANCEL</string>
     <string name="signal_state_title_text">Signal State:</string>
     <string name="signal_enabled_title_text">Signal Enabled:</string>
+    <string name="bad_url_message">The entered host URL was incorrectly formatted.</string>
 </resources>
