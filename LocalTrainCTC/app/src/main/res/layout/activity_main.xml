@@ -80,13 +80,13 @@
 
         </LinearLayout>
 
-        <Switch
+        <!--Switch
             android:id="@+id/signal_enabled_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:switchTextAppearance="@android:style/TextAppearance.Material.Title"
             android:text="@string/signal_enabled_title_text"
-            android:textAppearance="@android:style/TextAppearance.Material.Title" />
+            android:textAppearance="@android:style/TextAppearance.Material.Title" /-->
     </LinearLayout>
 
     <ImageButton
