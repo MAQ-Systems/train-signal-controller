@@ -148,9 +148,9 @@ void loop() {
     }
   }
 
-  // If a signal was received, wait 5 sec for it to change.
+  // If a signal was received, wait 2.5 sec for it to change.
   if (readWasMessage) {
-    delay(5000);
+    delay(2500);
   } else {
     delay(100);
   }

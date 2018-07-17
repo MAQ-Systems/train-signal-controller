@@ -30,7 +30,7 @@ public class MainActivity extends Activity implements View.OnClickListener{
     private static final String API_URL_PREF_STRING = "zone.mattjones.localtrainctc.apiurl";
 
     /** The amount of time to wait to re-enabled the buttons after a signal change. */
-    private static final int BUTTON_ENABLE_DELAY = 5000;
+    private static final int BUTTON_ENABLE_DELAY = 2500;
 
     /** The possible colors that the signal can be. */
     private enum SignalColor {
