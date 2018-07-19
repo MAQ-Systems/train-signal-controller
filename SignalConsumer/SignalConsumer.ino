@@ -51,9 +51,8 @@ typedef struct {
 // network info
 byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x2C, 0x47};
 byte staticIp[] = {192, 168, 1, 150};
-//byte serverIp[] = {24, 15, 183, 66};
-byte serverIp[] = {192, 168, 1, 105};
-char serverName[] = "www.iotitan.com";
+//byte serverIp[] = {192, 168, 1, 105};
+char serverName[] = "mattjones.zone";
 int serverPort = 19100;
 
 EthernetClient client;
@@ -106,7 +105,8 @@ void setup() {
  * @return True if successful
  */
 boolean connectToServer() {
-  client.connect(serverIp, serverPort);
+  //client.connect(serverIp, serverPort);
+  client.connect(serverName, serverPort);
   if(!client.connected()) return false;
   return true;
 }
