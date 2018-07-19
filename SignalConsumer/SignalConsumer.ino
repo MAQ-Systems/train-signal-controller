@@ -260,6 +260,14 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
   } else if ((msg[0] & SIGNAL_GREEN) > 0) {
     sm->color = GREEN;
   }
+
+  if ((msg[0] & SIGNAL_LAMP_ON) > 0) {
+    sm->lampState = ON;
+  } else if ((msg[0] & SIGNAL_BLINK) > 0) {
+    sm->lampState = BLINK;
+  } else if ((msg[0] & SIGNAL_LAMP_OFF) > 0) {
+    sm->lampState = OFF;
+  }
   
   return sm;
 }
