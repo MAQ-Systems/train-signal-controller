@@ -65,6 +65,7 @@ void printData(char* msg, int len);
 boolean isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
 void handleSignalMessage(void* smp);
+void resetOutputPins();
 
 
 /**
@@ -72,6 +73,12 @@ void handleSignalMessage(void* smp);
  */
 void setup() {
   Serial.begin(9600);
+
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(YELLOW_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+
+  resetOutputPins();
   
   // Try to get connection through dhcp.
   if(Ethernet.begin(mac) == 0) {
@@ -94,10 +101,6 @@ void setup() {
   } else {
     Serial.println("Initial connection failed!");
   }
-
-  pinMode(RED_PIN, OUTPUT);
-  pinMode(YELLOW_PIN, OUTPUT);
-  pinMode(GREEN_PIN, OUTPUT);
 }
 
 /**
@@ -190,19 +193,17 @@ void printData(char* msg, int len) {
 void handleSignalMessage(void* smp) {
   SignalMessage* sm = (SignalMessage*)smp;
 
-  digitalWrite(RED_PIN, LOW);
-  digitalWrite(YELLOW_PIN, LOW);
-  digitalWrite(GREEN_PIN, LOW);
+  resetOutputPins();
 
   Serial.write("Handling message: ");
   if (sm->color == RED) {
-    digitalWrite(RED_PIN, HIGH);
+    digitalWrite(RED_PIN, LOW);
     Serial.write("RED");
   } else if (sm->color == YELLOW) {
-    digitalWrite(YELLOW_PIN, HIGH);
+    digitalWrite(YELLOW_PIN, LOW);
     Serial.write("YELLOW");
   } else if (sm->color == GREEN) {
-    digitalWrite(GREEN_PIN, HIGH);
+    digitalWrite(GREEN_PIN, LOW);
     Serial.write("GREEN");
   }
 
@@ -215,6 +216,17 @@ void handleSignalMessage(void* smp) {
   }
   
   Serial.println("\n");
+}
+
+/**
+ * Reset the output pins that control the relays that turn the lamps for the
+ * signal on or off. For the specific relay used, LOW is closed for whatever
+ * reason so resetting means switching them to HIGH (signal lamps are off).
+ */
+void resetOutputPins() {
+  digitalWrite(RED_PIN, HIGH);
+  digitalWrite(YELLOW_PIN, HIGH);
+  digitalWrite(GREEN_PIN, HIGH);
 }
 
 /**
