@@ -64,7 +64,7 @@ boolean connectToServer();
 void printData(char* msg, int len);
 boolean isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
-void handleSignalMessage(void* smp);
+void handleSignalMessage(SignalMessage* smp);
 void resetOutputPins();
 
 
@@ -190,9 +190,7 @@ void printData(char* msg, int len) {
  * Parse signal message and set appropriate pins
  * @param smp A pointer to the signal message
  */
-void handleSignalMessage(void* smp) {
-  SignalMessage* sm = (SignalMessage*)smp;
-
+void handleSignalMessage(SignalMessage* sm) {
   resetOutputPins();
 
   Serial.write("Handling message: ");
