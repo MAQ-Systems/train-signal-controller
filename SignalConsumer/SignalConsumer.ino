@@ -27,6 +27,7 @@
 #define GREEN_PIN 5
 #define YELLOW_PIN 6
 #define RED_PIN 7
+#define FLASH_PIN 8
 
 typedef enum {
   RED = 0,
@@ -98,6 +99,7 @@ void setup() {
   pinMode(RED_PIN, OUTPUT);
   pinMode(YELLOW_PIN, OUTPUT);
   pinMode(GREEN_PIN, OUTPUT);
+  pinMode(FLASH_PIN, OUTPUT);
 }
 
 /**
@@ -129,7 +131,7 @@ void loop() {
   // Whether the network read was a signal message or empty.
   bool readWasMessage = false;
   
-  // wait for signal to switch for a bit before trying to read another (5 sec)
+  // wait for signal to switch for a bit before trying to read another (2.5 sec)
   if(client.connected()) {
     readBufferPos = 0;
     while((readBuffer[readBufferPos] = client.read()) != -1
@@ -193,6 +195,7 @@ void handleSignalMessage(void* smp) {
   digitalWrite(RED_PIN, LOW);
   digitalWrite(YELLOW_PIN, LOW);
   digitalWrite(GREEN_PIN, LOW);
+  digitalWrite(FLASH_PIN, LOW);
 
   Serial.write("Handling message: ");
   if (sm->color == RED) {
@@ -207,10 +210,13 @@ void handleSignalMessage(void* smp) {
   }
 
   if (sm->lampState == ON) {
+    digitalWrite(FLASH_PIN, LOW);
     Serial.write(" ON");
   } else if (sm->lampState == BLINK) {
+    digitalWrite(FLASH_PIN, HIGH);
     Serial.write(" BLINK");
   } else if (sm->lampState == OFF) {
+    digitalWrite(FLASH_PIN, LOW);
     Serial.write(" OFF");
   }
   
