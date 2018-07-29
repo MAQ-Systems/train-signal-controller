@@ -27,6 +27,7 @@
 #define GREEN_PIN 5
 #define YELLOW_PIN 6
 #define RED_PIN 7
+#define FLASH_PIN 8
 
 typedef enum {
   RED = 0,
@@ -51,9 +52,8 @@ typedef struct {
 // network info
 byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x2C, 0x47};
 byte staticIp[] = {192, 168, 1, 150};
-//byte serverIp[] = {24, 15, 183, 66};
-byte serverIp[] = {192, 168, 1, 105};
-char serverName[] = "www.iotitan.com";
+//byte serverIp[] = {192, 168, 1, 105};
+char serverName[] = "mattjones.zone";
 int serverPort = 19100;
 
 EthernetClient client;
@@ -65,7 +65,8 @@ boolean connectToServer();
 void printData(char* msg, int len);
 boolean isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
-void handleSignalMessage(void* smp);
+void handleSignalMessage(SignalMessage* smp);
+void resetOutputPins();
 
 
 /**
@@ -73,6 +74,13 @@ void handleSignalMessage(void* smp);
  */
 void setup() {
   Serial.begin(9600);
+
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(YELLOW_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  pinMode(FLASH_PIN, OUTPUT);
+
+  resetOutputPins();
   
   // Try to get connection through dhcp.
   if(Ethernet.begin(mac) == 0) {
@@ -96,9 +104,6 @@ void setup() {
     Serial.println("Initial connection failed!");
   }
 
-  pinMode(RED_PIN, OUTPUT);
-  pinMode(YELLOW_PIN, OUTPUT);
-  pinMode(GREEN_PIN, OUTPUT);
 }
 
 /**
@@ -106,7 +111,8 @@ void setup() {
  * @return True if successful
  */
 boolean connectToServer() {
-  client.connect(serverIp, serverPort);
+  //client.connect(serverIp, serverPort);
+  client.connect(serverName, serverPort);
   if(!client.connected()) return false;
   return true;
 }
@@ -129,7 +135,7 @@ void loop() {
   // Whether the network read was a signal message or empty.
   bool readWasMessage = false;
   
-  // wait for signal to switch for a bit before trying to read another (5 sec)
+  // wait for signal to switch for a bit before trying to read another (2.5 sec)
   if(client.connected()) {
     readBufferPos = 0;
     while((readBuffer[readBufferPos] = client.read()) != -1
@@ -187,34 +193,45 @@ void printData(char* msg, int len) {
  * Parse signal message and set appropriate pins
  * @param smp A pointer to the signal message
  */
-void handleSignalMessage(void* smp) {
-  SignalMessage* sm = (SignalMessage*)smp;
-
-  digitalWrite(RED_PIN, LOW);
-  digitalWrite(YELLOW_PIN, LOW);
-  digitalWrite(GREEN_PIN, LOW);
+void handleSignalMessage(SignalMessage* sm) {
+  resetOutputPins();
 
   Serial.write("Handling message: ");
   if (sm->color == RED) {
-    digitalWrite(RED_PIN, HIGH);
+    digitalWrite(RED_PIN, LOW);
     Serial.write("RED");
   } else if (sm->color == YELLOW) {
-    digitalWrite(YELLOW_PIN, HIGH);
+    digitalWrite(YELLOW_PIN, LOW);
     Serial.write("YELLOW");
   } else if (sm->color == GREEN) {
-    digitalWrite(GREEN_PIN, HIGH);
+    digitalWrite(GREEN_PIN, LOW);
     Serial.write("GREEN");
   }
 
   if (sm->lampState == ON) {
+    digitalWrite(FLASH_PIN, LOW);
     Serial.write(" ON");
   } else if (sm->lampState == BLINK) {
+    digitalWrite(FLASH_PIN, HIGH);
     Serial.write(" BLINK");
   } else if (sm->lampState == OFF) {
+    digitalWrite(FLASH_PIN, LOW);
     Serial.write(" OFF");
   }
   
   Serial.println("\n");
+}
+
+/**
+ * Reset the output pins that control the relays that turn the lamps for the
+ * signal on or off. For the specific relay used, LOW is closed for whatever
+ * reason so resetting means switching them to HIGH (signal lamps are off).
+ */
+void resetOutputPins() {
+  digitalWrite(RED_PIN, HIGH);
+  digitalWrite(YELLOW_PIN, HIGH);
+  digitalWrite(GREEN_PIN, HIGH);
+  digitalWrite(FLASH_PIN, HIGH);
 }
 
 /**
@@ -259,6 +276,14 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
     sm->color = YELLOW;
   } else if ((msg[0] & SIGNAL_GREEN) > 0) {
     sm->color = GREEN;
+  }
+
+  if ((msg[0] & SIGNAL_LAMP_ON) > 0) {
+    sm->lampState = ON;
+  } else if ((msg[0] & SIGNAL_BLINK) > 0) {
+    sm->lampState = BLINK;
+  } else if ((msg[0] & SIGNAL_LAMP_OFF) > 0) {
+    sm->lampState = OFF;
   }
   
   return sm;
