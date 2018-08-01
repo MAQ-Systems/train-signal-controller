@@ -1,40 +1,44 @@
-<project name="TrainSignalApi" default="war" basedir=".">
+<project name="TrainSignalApi" default="war" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">
 
     <description>
         The REST API for the train signal controller.
     </description>
 
-	<!-- Build params. -->
+    <!-- Build params. -->
     <property name="out-dir" location="out" />
     <property name="src-dir" location="src" />
-	<property name="inf-dir" location="WebContent/WEB-INF/web.xml" />
-	<property name="war-name" value="TrainSignalApi.war" />
-    <property name="tomcat-install-dir" location="C:/Users/Matt/Downloads/apache-tomcat-8.5.32" />
+    <property name="inf-dir" location="WebContent/WEB-INF/web.xml" />
+    <property name="war-name" value="TrainSignalApi.war" />
 
-	<!-- Create the output directory for this project. -->
+    <!-- Create the output directory for this project. -->
     <target name="create-out">
         <mkdir dir="${out-dir}/build" />
     </target>
 
     <!-- Build the web app file. -->
     <target name="war" depends="compile">
-		<war destfile="${out-dir}/${war-name}" webxml="${inf-dir}">
-			<fileset dir="${out-dir}/build" />
-		</war>
+        <war destfile="${out-dir}/${war-name}" webxml="${inf-dir}">
+            <fileset dir="${out-dir}/build" />
+        </war>
     </target>
 
-	<!-- Compile web app source. -->
-    <target name="compile" depends="create-out">
+    <!-- Compile web app source. -->
+    <target name="compile" depends="create-out,resolve">
         <javac srcdir="${src-dir}"
                 includes="**"
                 destdir="${out-dir}/build"
                 debug="on">
             <classpath>
-                <fileset dir="${tomcat-install-dir}/lib">
-                    <include name="*.jar" />
+                <fileset dir="${out-dir}/lib">
+                    <include name="**/*.jar" />
                 </fileset>
             </classpath>
         </javac>
+    </target>
+
+    <!-- Resolve any dependencies this project has. -->
+    <target name="resolve" depends="create-out">
+        <ivy:retrieve type="jar" pattern="${out-dir}/lib/[type]/[artifact]-[revision].[ext]" />
     </target>
 
     <!-- Delete the current output directory -->

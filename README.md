@@ -4,7 +4,7 @@
     - This can be modified and flashed to the device with the [Arduino IDE](https://www.arduino.cc/en/Main/Software).
 - __TrainSignalApi__: A Java servlet application that runs on the server. This software is responsible for both serving the web API and listening for connections from the SignalConsumer.
     - This is an [Eclipse Java EE](https://www.eclipse.org/downloads/) project.
-    - Alternatively, this can be built using [Apache Ant](https://ant.apache.org/bindownload.cgi) using the build.xml file in this directory.
+    - Alternatively, this can be built using [Apache Ant](https://ant.apache.org/bindownload.cgi) with [Ivy](http://ant.apache.org/ivy/download.cgi) using the build.xml file in this directory.
         - The generated war file can be found in the "out" directory.
 - __LocalTrainCTC__: An Android phone app to send color change commands to the signal.
     - This is an [Android Studio](https://developer.android.com/studio/) project.
