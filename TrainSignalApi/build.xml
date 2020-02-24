@@ -18,7 +18,7 @@
     <!-- Build the web app file. -->
     <target name="war" depends="compile">
         <war destfile="${out-dir}/${war-name}" webxml="${inf-dir}">
-            <fileset dir="${out-dir}/build" />
+            <classes dir="${out-dir}/build" />
         </war>
     </target>
 
