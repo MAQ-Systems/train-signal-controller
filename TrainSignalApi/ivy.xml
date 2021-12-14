@@ -1,6 +1,6 @@
 <ivy-module version="2.0">
     <info organisation="zone.mattjones" module="TrainSignalApi" /> 
     <dependencies>
-        <dependency org="org.apache.tomcat" name="tomcat-servlet-api" rev="8.5.32"/>
+        <dependency org="org.apache.tomcat" name="tomcat-servlet-api" rev="10.0.14"/>
     </dependencies>
 </ivy-module>

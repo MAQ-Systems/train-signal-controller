@@ -10,17 +10,17 @@ package zone.mattjones.trainsignal;
 import java.io.IOException;
 import java.net.Socket;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import zone.mattjones.trainsignal.TrainSignalMessage.LampState;
 import zone.mattjones.trainsignal.TrainSignalMessage.SignalColor;
 
 public class TrainSignalApi extends HttpServlet {
-    private static final long serialVersionUID = 06012014L;
+    private static final long serialVersionUID = 20211213L;
 
     /** The port for the connection to the train signal to run on. */
     private static final int SERVER_PORT = 19100;
