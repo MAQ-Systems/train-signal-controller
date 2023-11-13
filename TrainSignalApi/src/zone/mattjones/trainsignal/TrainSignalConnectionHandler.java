@@ -44,30 +44,29 @@ public class TrainSignalConnectionHandler extends Thread {
                 if (mServerSocket == null || mServerSocket.isClosed()) {
                     mServerSocket = new ServerSocket(mPort);
                 }
+
+                // Block until a connection is made. Currently, it's only possible to run with a
+                // single connected client.
                 Socket newConnection = mServerSocket.accept();
                 if (mActiveClientSocket != null && mActiveClientSocket.isConnected()) {
                     mActiveClientSocket.close();
                 }
                 mActiveClientSocket = newConnection;
-                sendMessages();
 
-                // Sleep for one minute. A message being added to the queue will interrupt this.
-                Thread.sleep(60000);
+                while (mActiveClientSocket.isConnected()) {
+                    sendMessages();
+
+                    // Sleep for one minute. A message being added to the queue will interrupt this.
+                    try {
+                        Thread.sleep(60000);
+                    } catch (InterruptedException e) {
+                        System.err.println("[info]: Messaging thread interrupted - a message was "
+                                + "likely enqueued.");
+                    }
+                }
 
             } catch (IOException e) {
                 System.err.println("[error]: Messaging thread exception: " + e.getMessage());
-            } catch (InterruptedException e) {
-                System.err.println(
-                        "[info]: Messaging thread interrupted - likely a message was enqueued.");
-            }
-            
-            // If we reach this point, the server has connected a new client. Sleep for 5 seconds
-            // in case the system is failing to connect (the client should be trying to connect far
-            // fewer times than this).
-            try {
-                Thread.sleep(5000);
-            } catch (InterruptedException e) {
-                // Do nothing if sleep failed.
             }
         }
     }
