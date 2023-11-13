@@ -10,6 +10,7 @@ package zone.mattjones.trainsignal;
 import java.io.IOException;
 
 import jakarta.servlet.ServletConfig;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -17,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import zone.mattjones.trainsignal.TrainSignalMessage.LampState;
 import zone.mattjones.trainsignal.TrainSignalMessage.SignalColor;
 
+@WebServlet(name="TrainSignalApi", urlPatterns = "/api", loadOnStartup = 1)
 public class TrainSignalApi extends HttpServlet {
     private static final long serialVersionUID = 20211213L;
 
