@@ -25,6 +25,8 @@ public class TrainSignalConnectionHandler extends Thread {
     private Socket mActiveClientSocket;
     
     /** Messages waiting to be sent to the train signal. */
+    // TODO(Matt): This probably doesn't need to be a list since messages are sent immediately. The
+    //             only reason to keep this would be for diagnostic messages.
     private ConcurrentLinkedQueue<byte[]> mMessages;
     
     /** Whether the server should stop on the next iteration. */
