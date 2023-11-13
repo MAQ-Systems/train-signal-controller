@@ -91,10 +91,11 @@ public class TrainSignalApi extends HttpServlet {
         }
         
         byte[] signalMessage = TrainSignalMessage.generateMessage(color, lamp);
-        mConnectionHandler.addMessage(signalMessage);
+        boolean success = mConnectionHandler.addMessage(signalMessage);
         
         String messageString = new String(signalMessage);
-        response.getWriter().append("{\"currentState\":\"" + messageString + "\"}");
+        response.getWriter().append(
+                "{\"error\":" + !success + ",\"currentState\":\"" + messageString + "\"}");
         response.getWriter().flush();
         response.getWriter().close();
     }

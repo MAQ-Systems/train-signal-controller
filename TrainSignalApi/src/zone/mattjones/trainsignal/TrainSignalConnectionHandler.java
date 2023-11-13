@@ -15,6 +15,9 @@ import java.net.Socket;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TrainSignalConnectionHandler extends Thread {
+    /** The maximum number of messages that can be queued up for a connected signal. */
+    private static final int MAX_QUEUE_SIZE = 5;
+
     /** The port for the server to run on. */
     private final int mPort;
     
@@ -96,8 +99,9 @@ public class TrainSignalConnectionHandler extends Thread {
     /**
      * Add a message to the queue. If a client is connected, the message is sent immediately.
      * @param message The message to send to the client.
+     * @return Whether the operation was successful.
      */
-    public void addMessage(byte[] message) {
+    public boolean addMessage(byte[] message) {
         // If no client is connected, only allow one message (the most recent) to be added to the
         // queue. This will prevent a message flood (and memory leak) if the signal disconnects and
         // messages continue to be added.
@@ -105,10 +109,20 @@ public class TrainSignalConnectionHandler extends Thread {
                 mActiveClientSocket.isClosed()) {
             mMessages.clear();
             mMessages.add(message);
-            return;
+            System.err.println("[warning]: Message added while signal disconnected. Only the most "
+                    + "recent message will be sent once connected.");
+            return true;
         }
+
+        if (mMessages.size() >= MAX_QUEUE_SIZE) {
+            System.err.println("[error]: Signal message queue size exceeded! Ignoring message... ");
+            return false;
+        }
+
         mMessages.add(message);
         interrupt();
+
+        return true;
     }
     
     /**
