@@ -20,7 +20,7 @@ import zone.mattjones.trainsignal.TrainSignalMessage.SignalColor;
 
 @WebServlet(name="TrainSignalApi", urlPatterns = "/api", loadOnStartup = 1)
 public class TrainSignalApi extends HttpServlet {
-    private static final long serialVersionUID = 20211213L;
+    private static final long serialVersionUID = 20231112L;
 
     /** The port for the connection to the train signal to run on. */
     private static final int SERVER_PORT = 19100;
