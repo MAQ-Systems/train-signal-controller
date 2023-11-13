@@ -98,9 +98,17 @@ public class TrainSignalConnectionHandler extends Thread {
      * @param message The message to send to the client.
      */
     public void addMessage(byte[] message) {
+        // If no client is connected, only allow one message (the most recent) to be added to the
+        // queue. This will prevent a message flood (and memory leak) if the signal disconnects and
+        // messages continue to be added.
+        if (mActiveClientSocket == null || !mActiveClientSocket.isConnected() ||
+                mActiveClientSocket.isClosed()) {
+            mMessages.clear();
+            mMessages.add(message);
+            return;
+        }
         mMessages.add(message);
         interrupt();
-        sendMessages();
     }
     
     /**
