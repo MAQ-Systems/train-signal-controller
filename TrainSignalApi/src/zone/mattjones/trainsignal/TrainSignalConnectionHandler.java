@@ -50,8 +50,15 @@ public class TrainSignalConnectionHandler extends Thread {
                 }
                 mActiveClientSocket = newConnection;
                 sendMessages();
+
+                // Sleep for one minute. A message being added to the queue will interrupt this.
+                Thread.sleep(60000);
+
             } catch (IOException e) {
-                // Do nothing
+                System.err.println("[error]: Messaging thread exception: " + e.getMessage());
+            } catch (InterruptedException e) {
+                System.err.println(
+                        "[info]: Messaging thread interrupted - likely a message was enqueued.");
             }
             
             // If we reach this point, the server has connected a new client. Sleep for 5 seconds
@@ -91,6 +98,7 @@ public class TrainSignalConnectionHandler extends Thread {
      */
     public void addMessage(byte[] message) {
         mMessages.add(message);
+        interrupt();
         sendMessages();
     }
     

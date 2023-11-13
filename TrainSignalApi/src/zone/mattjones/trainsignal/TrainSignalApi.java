@@ -8,10 +8,8 @@
 package zone.mattjones.trainsignal;
 
 import java.io.IOException;
-import java.net.Socket;
 
 import jakarta.servlet.ServletConfig;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,20 +25,18 @@ public class TrainSignalApi extends HttpServlet {
     
     /** The thread handling connections to the train signal. */
     private TrainSignalConnectionHandler mConnectionHandler;
-    
-    /**
-     * Constructor that sets up the server socket listener for the arduino to connect to.
-     */
-    public TrainSignalApi() {
-        mConnectionHandler = new TrainSignalConnectionHandler(SERVER_PORT);
-    }
+
+    public TrainSignalApi() {}
     
     @Override
-    public void init(ServletConfig config) {}
+    public void init(ServletConfig config) {
+        // Set up the server socket listener for the arduino to connect to.
+        mConnectionHandler = new TrainSignalConnectionHandler(SERVER_PORT);
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
+            throws IOException {
         // Read input from the params in the URL.
         String colorString = request.getParameter("color");
         SignalColor color = SignalColor.RED;

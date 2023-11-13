@@ -9,6 +9,7 @@
 	<servlet>
 		<servlet-name>Train Signal API</servlet-name>
 		<servlet-class>zone.mattjones.trainsignal.TrainSignalApi</servlet-class>
+		<load-on-startup>1</load-on-startup>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>Train Signal API</servlet-name>
