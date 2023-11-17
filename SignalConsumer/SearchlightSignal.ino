@@ -1,17 +1,26 @@
 /**
- * File: SignalProgram.ino
+ * File: SearchlightSignal.ino
  * Author: Matt Jones
  * Model: Arduino Uno
- * Date: 5/15/14
- * Desc: The arduino client program to consume signal commands from
- *       the signal queue program living on the server.
+ * Date: 2023.11.16 (original: 2014.05.15)
+ * Desc: The arduino client program to consume and translate signal messages
+ *       received from the server.
+ *       This program does not poll the server for updates, but instead opens
+ *       a TCP socket that the server hosts. This allows commands to be
+ *       processed immediately after sending rather than blocking or timing out
+ *       waiting for a HTTP response.
  */
  
 #include <SPI.h>
 #include <Ethernet.h>
 #include <string.h>
 
-#define BUFFER_SIZE 32 // 32 should be plenty for anything we are receiving
+// 32 bytes is plenty for signal messages (usually 1 byte).
+// TODO(Matt): If the signal is eventually named, that will be sent _from_ the
+//             signal and used to reference the device on the server. So this
+//             buffer can probably be even smaller. Name can possibly be
+//             provided via SD card.
+#define BUFFER_SIZE 32
 
 // Different states for a signal to be in
 #define SIGNAL_BASE     1  // 00000001
@@ -24,10 +33,11 @@
 
 #define MESSAGE_TERMINATING_CHAR '!'
 
-#define GREEN_PIN 5
-#define YELLOW_PIN 6
-#define RED_PIN 7
-#define FLASH_PIN 8
+// Use pins that aren't dual purpose.
+#define ASPECT_POWER_PIN 5
+#define ASPECT_IN_PIN 6
+#define ASPECT_OUT_PIN 7
+#define LAMP_FLASH_PIN 8
 
 typedef enum {
   RED = 0,
@@ -51,8 +61,7 @@ typedef struct {
 
 // network info
 byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x2C, 0x47};
-byte staticIp[] = {192, 168, 1, 150};
-//byte serverIp[] = {192, 168, 1, 105};
+byte staticIp[] = {192, 168, 32, 150};
 char serverName[] = "mattjones.zone";
 int serverPort = 19100;
 
@@ -66,8 +75,9 @@ void printData(char* msg, int len);
 boolean isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
 void handleSignalMessage(SignalMessage* smp);
-void resetOutputPins();
-
+void setupPins();
+void setColor(SignalColor color);
+void setLamp(LampState state);
 
 /**
  * Setup initial 
@@ -75,12 +85,10 @@ void resetOutputPins();
 void setup() {
   Serial.begin(9600);
 
-  pinMode(RED_PIN, OUTPUT);
-  pinMode(YELLOW_PIN, OUTPUT);
-  pinMode(GREEN_PIN, OUTPUT);
-  pinMode(FLASH_PIN, OUTPUT);
+  setupPins();
 
-  resetOutputPins();
+  setColor(SignalColor::RED);
+  setLamp(LampState::ON);
   
   // Try to get connection through dhcp.
   if(Ethernet.begin(mac) == 0) {
@@ -103,7 +111,6 @@ void setup() {
   } else {
     Serial.println("Initial connection failed!");
   }
-
 }
 
 /**
@@ -194,44 +201,72 @@ void printData(char* msg, int len) {
  * @param smp A pointer to the signal message
  */
 void handleSignalMessage(SignalMessage* sm) {
-  resetOutputPins();
+  Serial.println("Handling message:");
 
-  Serial.write("Handling message: ");
-  if (sm->color == RED) {
-    digitalWrite(RED_PIN, LOW);
-    Serial.write("RED");
-  } else if (sm->color == YELLOW) {
-    digitalWrite(YELLOW_PIN, LOW);
-    Serial.write("YELLOW");
-  } else if (sm->color == GREEN) {
-    digitalWrite(GREEN_PIN, LOW);
-    Serial.write("GREEN");
-  }
+  setColor(sm->color);
+  setLamp(sm->lampState); 
 
-  if (sm->lampState == ON) {
-    digitalWrite(FLASH_PIN, LOW);
-    Serial.write(" ON");
-  } else if (sm->lampState == BLINK) {
-    digitalWrite(FLASH_PIN, HIGH);
-    Serial.write(" BLINK");
-  } else if (sm->lampState == OFF) {
-    digitalWrite(FLASH_PIN, LOW);
-    Serial.write(" OFF");
-  }
-  
   Serial.println("\n");
 }
 
-/**
- * Reset the output pins that control the relays that turn the lamps for the
- * signal on or off. For the specific relay used, LOW is closed for whatever
- * reason so resetting means switching them to HIGH (signal lamps are off).
- */
-void resetOutputPins() {
-  digitalWrite(RED_PIN, HIGH);
-  digitalWrite(YELLOW_PIN, HIGH);
-  digitalWrite(GREEN_PIN, HIGH);
-  digitalWrite(FLASH_PIN, HIGH);
+void setupPins() {
+  pinMode(ASPECT_POWER_PIN, OUTPUT);
+  pinMode(ASPECT_IN_PIN, OUTPUT);
+  pinMode(ASPECT_OUT_PIN, OUTPUT);
+  pinMode(LAMP_FLASH_PIN, OUTPUT);
+}
+
+void setColor(SignalColor color) {
+  if (color == RED) {
+    // Turning off the power to the aspect/color switcher means the magnet
+    // receives no power and falls to "neutral" which is red (center roundlet).
+    digitalWrite(ASPECT_POWER_PIN, HIGH);
+
+    // The other aspect in/out pins don't matter in this case, but we set them
+    // HIGH so the relays go to their "normally open" position.
+    digitalWrite(ASPECT_IN_PIN, HIGH);
+    digitalWrite(ASPECT_OUT_PIN, HIGH);
+    
+    Serial.println("  COLOR: RED");
+  } else if (color == YELLOW) {
+    // Send power to the aspect/color switcher.
+    digitalWrite(ASPECT_POWER_PIN, LOW);
+
+    // Set the polarity to swing the arm to yellow (right roundlet).
+    // THE IN AND OUT PINS MUST MATCH FOR YELLOW AND GREEN.
+    digitalWrite(ASPECT_IN_PIN, LOW);
+    digitalWrite(ASPECT_OUT_PIN, LOW);
+
+    Serial.println("  COLOR: YELLOW");
+  } else if (color == GREEN) {
+    // Send power to the aspect/color switcher.
+    digitalWrite(ASPECT_POWER_PIN, LOW);
+
+    // Set the polarity to swing the arm to green (left roundlet).
+    // THE IN AND OUT PINS MUST MATCH FOR YELLOW AND GREEN.
+    digitalWrite(ASPECT_IN_PIN, HIGH);
+    digitalWrite(ASPECT_OUT_PIN, HIGH);
+
+    Serial.println("  COLOR: GREEN");
+  } else {
+    Serial.println("  COLOR: NOT HANDLED!");
+  }
+}
+
+void setLamp(LampState state) {
+  if (state == ON) {
+    digitalWrite(LAMP_FLASH_PIN, HIGH);
+    Serial.println("  LAMP: ON");
+  } else if (state == BLINK) {
+    digitalWrite(LAMP_FLASH_PIN, LOW);
+    Serial.println("  LAMP: BLINK");
+  } else if (state == OFF) {
+    // Currently unsupported. If the signal is plugged in the lamp is either on
+    // or blinking.
+    Serial.println("  LAMP: OFF (currently unsupported)");
+  } else {
+    Serial.println("  LAMP: STATE NOT HANDLED!");
+  }
 }
 
 /**
