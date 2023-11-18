@@ -58,7 +58,7 @@ public class TrainSignalConnectionHandler extends Thread {
                 }
                 mActiveClientSocket = newConnection;
 
-                while (mActiveClientSocket.isConnected()) {
+                while (mActiveClientSocket.isConnected() && !mActiveClientSocket.isClosed()) {
                     sendMessages();
 
                     // Sleep for one minute. A message being added to the queue will interrupt this.
@@ -68,6 +68,10 @@ public class TrainSignalConnectionHandler extends Thread {
                         System.err.println("[info]: Messaging thread interrupted - a message was "
                                 + "likely enqueued.");
                     }
+                }
+
+                if (!mActiveClientSocket.isClosed()) {
+                    mActiveClientSocket.close();
                 }
 
             } catch (IOException e) {
