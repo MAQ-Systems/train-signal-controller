@@ -10,13 +10,18 @@
 package zone.mattjones.trainsignal;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class TrainSignalConnectionHandler extends Thread {
     /** The maximum number of messages that can be queued up for a connected signal. */
     private static final int MAX_QUEUE_SIZE = 5;
+
+    /** The most we're willing to read as feedback from the signal. */
+    private static final int MAX_READ_SIZE_BYTES = 64;
 
     /** The port for the server to run on. */
     private final int mPort;
@@ -48,11 +53,6 @@ public class TrainSignalConnectionHandler extends Thread {
             // If something happened to the server socket, reinitialize it.
             if (mServerSocket == null || mServerSocket.isClosed()) {
                 try {
-                    if (mServerSocket != null) {
-                        mServerSocket.close();
-                        mServerSocket = null;
-                    }
-
                     mServerSocket = new ServerSocket(mPort);
                 } catch (IOException ex) {
                     mServerSocket = null;
@@ -120,9 +120,28 @@ public class TrainSignalConnectionHandler extends Thread {
                 byte[] curMessage = mMessages.poll();
                 mActiveClientSocket.getOutputStream().write(curMessage);
                 mActiveClientSocket.getOutputStream().flush();
+
+                // Expect an acknowledgement before trying to send the next message.
+                byte[] buffer = new byte[16];
+                int size;
+                int totalBytesRead = 0;
+                String message = "";
+                InputStream in = mActiveClientSocket.getInputStream();
+                while ((size = in.read(buffer, 0, buffer.length)) >= 0) {
+                    totalBytesRead += size;
+                    if (totalBytesRead > MAX_READ_SIZE_BYTES) {
+                        // TODO(Matt): Consider disconnecting here.
+                        break;
+                    }
+                    message += new String(buffer, 0, size, Charset.defaultCharset());
+                }
+
+                if (!TrainSignalMessage.isAckMessage(message)) {
+                    System.err.println("[warning]: Did not receive expected ack from signal!");
+                }
             }
         } catch (IOException e) {
-            // Do nothing.
+            System.err.println("[error]: Sending message failed!: " + e.getMessage());
         }
     }
     

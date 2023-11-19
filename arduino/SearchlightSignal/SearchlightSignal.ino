@@ -39,6 +39,11 @@
 #define ASPECT_OUT_PIN 7
 #define LAMP_FLASH_PIN 8
 
+// A message to send back to the server for each one that is received. This is
+// just the "0" state with the terminating character.
+char ACK_MESSAGE[] = {(char)0, MESSAGE_TERMINATING_CHAR};
+int ACK_MESSAGE_SIZE = 2;
+
 typedef enum {
   RED = 0,
   YELLOW = 1,
@@ -158,6 +163,10 @@ void loop() {
       readWasMessage = true;
       handleSignalMessage(sm);
       delete sm;
+
+      // If there wasn't a null message send back and acknowledge that the
+      // message was received.
+      client.write(ACK_MESSAGE, ACK_MESSAGE_SIZE);
     }
   }
 

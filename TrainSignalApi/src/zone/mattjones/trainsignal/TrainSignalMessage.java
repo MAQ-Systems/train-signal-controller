@@ -50,6 +50,9 @@ public class TrainSignalMessage {
     
     /** The character all messages should end with. */
     private static final char MESSAGE_TERMINATING_CHAR = '!';
+
+    /** The acknowledgement message expected for each message sent to the signal. */
+    private static final String ACK_MESSAGE = "" + ((char) 0) + MESSAGE_TERMINATING_CHAR;
     
     /** Private constructor to prevent instantiation. */
     private TrainSignalMessage() {}
@@ -93,5 +96,13 @@ public class TrainSignalMessage {
         message[1] = MESSAGE_TERMINATING_CHAR;
         
         return message;
+    }
+
+    /**
+     * @param message The message to check.
+     * @return Whether a message received from the signal is an acknowledgment of a sent message.
+     */
+    public static boolean isAckMessage(String message) {
+        return message != null && ACK_MESSAGE.equals(message);
     }
 }
