@@ -165,7 +165,8 @@ void loop() {
   if (readWasMessage) {
     delay(2500);
   } else {
-    delay(100);
+    // Otherwise poll every 500ms.
+    delay(500);
   }
 }
 
@@ -217,10 +218,17 @@ void setupPins() {
 }
 
 void setColor(SignalColor color) {
+  // Cut power to the aspect/color changer prior to switching the color so we
+  // don't temporarily short the power supply.
+  digitalWrite(ASPECT_POWER_PIN, HIGH);
+  delay(250);
+
+  bool enableAspectPower = false;
+
   if (color == RED) {
     // Turning off the power to the aspect/color switcher means the magnet
     // receives no power and falls to "neutral" which is red (center roundlet).
-    digitalWrite(ASPECT_POWER_PIN, HIGH);
+    enableAspectPower = false;
 
     // The other aspect in/out pins don't matter in this case, but we set them
     // HIGH so the relays go to their "normally open" position.
@@ -230,7 +238,7 @@ void setColor(SignalColor color) {
     Serial.println("  COLOR: RED");
   } else if (color == YELLOW) {
     // Send power to the aspect/color switcher.
-    digitalWrite(ASPECT_POWER_PIN, LOW);
+    enableAspectPower = true;
 
     // Set the polarity to swing the arm to yellow (right roundlet).
     // THE IN AND OUT PINS MUST MATCH FOR YELLOW AND GREEN.
@@ -240,7 +248,7 @@ void setColor(SignalColor color) {
     Serial.println("  COLOR: YELLOW");
   } else if (color == GREEN) {
     // Send power to the aspect/color switcher.
-    digitalWrite(ASPECT_POWER_PIN, LOW);
+    enableAspectPower = true;
 
     // Set the polarity to swing the arm to green (left roundlet).
     // THE IN AND OUT PINS MUST MATCH FOR YELLOW AND GREEN.
@@ -250,6 +258,13 @@ void setColor(SignalColor color) {
     Serial.println("  COLOR: GREEN");
   } else {
     Serial.println("  COLOR: NOT HANDLED!");
+  }
+
+  if (enableAspectPower) {
+    // Same as at the top of this function. Wait until the relays have flipped
+    // so we don't short the power (if turning it back on).
+    delay(250);
+    digitalWrite(ASPECT_POWER_PIN, LOW);
   }
 }
 
