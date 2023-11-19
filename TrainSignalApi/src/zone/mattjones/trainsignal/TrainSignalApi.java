@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import zone.mattjones.common.scheduler.ThreadScheduler;
 import zone.mattjones.trainsignal.TrainSignalMessage.LampState;
 import zone.mattjones.trainsignal.TrainSignalMessage.SignalColor;
 
@@ -28,12 +29,17 @@ public class TrainSignalApi extends HttpServlet {
     /** The thread handling connections to the train signal. */
     private TrainSignalConnectionHandler mConnectionHandler;
 
+    /** A scheduler for running tasks asynchronously. */
+    private ThreadScheduler mScheduler;
+
     public TrainSignalApi() {}
     
     @Override
     public void init(ServletConfig config) {
+        mScheduler = new ThreadScheduler();
+
         // Set up the server socket listener for the arduino to connect to.
-        mConnectionHandler = new TrainSignalConnectionHandler(SERVER_PORT);
+        mConnectionHandler = new TrainSignalConnectionHandler(SERVER_PORT, mScheduler);
     }
 
     @Override
@@ -98,5 +104,13 @@ public class TrainSignalApi extends HttpServlet {
                 "{\"error\":" + !success + ",\"currentState\":\"" + messageString + "\"}");
         response.getWriter().flush();
         response.getWriter().close();
+    }
+
+    @Override
+    public void destroy() {
+        if (mScheduler != null) {
+            mScheduler.shutdown();
+        }
+        super.destroy();
     }
 }

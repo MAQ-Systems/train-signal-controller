@@ -41,7 +41,7 @@
 
 // A message to send back to the server for each one that is received. This is
 // just the "0" state with the terminating character.
-char ACK_MESSAGE[] = {(char)0, MESSAGE_TERMINATING_CHAR};
+byte ACK_MESSAGE[] = {SIGNAL_BASE, MESSAGE_TERMINATING_CHAR};
 int ACK_MESSAGE_SIZE = 2;
 
 typedef enum {
@@ -62,11 +62,12 @@ typedef enum {
 typedef struct {
   LampState lampState;
   SignalColor color;
+  bool isAck;
 } SignalMessage;
 
 // network info
 byte mac[] = {0x90, 0xA2, 0xDA, 0x0F, 0x2C, 0x47};
-byte staticIp[] = {192, 168, 32, 150};
+byte staticIp[] = {192, 168, 32, 100};
 char serverName[] = "mattjones.zone";
 int serverPort = 19100;
 
@@ -80,6 +81,7 @@ void printData(char* msg, int len);
 boolean isValidMessage(char* msg, int len);
 SignalMessage* parseSignalMessage(char* msg, int len);
 void handleSignalMessage(SignalMessage* smp);
+bool isAckMessage(char* msg, int len);
 void setupPins();
 void setColor(SignalColor color);
 void setLamp(LampState state);
@@ -123,6 +125,7 @@ void setup() {
  * @return True if successful
  */
 boolean connectToServer() {
+  //byte serverIp[] = {192, 168, 32, 42};
   //client.connect(serverIp, serverPort);
   client.connect(serverName, serverPort);
   if(!client.connected()) return false;
@@ -159,6 +162,7 @@ void loop() {
     
     // parse the message and switch appropriate pins
     SignalMessage* sm = parseSignalMessage(readBuffer, readBufferPos);
+
     if(sm != NULL) {
       readWasMessage = true;
       handleSignalMessage(sm);
@@ -167,6 +171,7 @@ void loop() {
       // If there wasn't a null message send back and acknowledge that the
       // message was received.
       client.write(ACK_MESSAGE, ACK_MESSAGE_SIZE);
+      client.flush();
     }
   }
 
@@ -213,10 +218,13 @@ void printData(char* msg, int len) {
 void handleSignalMessage(SignalMessage* sm) {
   Serial.println("Handling message:");
 
-  setColor(sm->color);
-  setLamp(sm->lampState); 
-
-  Serial.println("\n");
+  if (sm->isAck) {
+    Serial.println("  Ping pong");
+  } else {
+    setColor(sm->color);
+    setLamp(sm->lampState);
+    Serial.println("\n");
+  }
 }
 
 void setupPins() {
@@ -328,6 +336,14 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
   // init signal message
   sm->lampState = OFF;
   sm->color = RED;
+  sm->isAck = false;
+
+  // First check if this is a ping pong message. If it is, we don't need to do
+  // anything else.
+  if (isAckMessage(msg, len)) {
+    sm->isAck = true;
+    return sm;
+  }
 
   if ((msg[0] & SIGNAL_RED) > 0) {
     sm->color = RED;
@@ -348,3 +364,6 @@ SignalMessage* parseSignalMessage(char* msg, int len) {
   return sm;
 }
 
+bool isAckMessage(char* msg, int len) {
+  return isValidMessage(msg, len) && (msg[0] | SIGNAL_BASE) == SIGNAL_BASE;
+}

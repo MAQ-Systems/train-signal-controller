@@ -7,7 +7,8 @@
     <!-- Build params. -->
     <property name="out-dir" location="out" />
     <property name="src-dir" location="src" />
-    <property name="inf-dir" location="WebContent/WEB-INF/web.xml" />
+    <property name="lib-dir" location="WebContent/WEB-INF/lib" />
+    <property name="web-inf" location="WebContent/WEB-INF/web.xml" />
     <property name="war-name" value="TrainSignalApi.war" />
 
     <!-- Create the output directory for this project. -->
@@ -17,8 +18,11 @@
 
     <!-- Build the web app file. -->
     <target name="war" depends="compile">
-        <war destfile="${out-dir}/${war-name}" webxml="${inf-dir}">
+        <war destfile="${out-dir}/${war-name}" webxml="${web-inf}">
             <classes dir="${out-dir}/build" />
+            <lib dir="${lib-dir}">
+                <include name="**/*.jar" />
+            </lib>
         </war>
     </target>
 
@@ -30,6 +34,9 @@
                 debug="on">
             <classpath>
                 <fileset dir="${out-dir}/lib">
+                    <include name="**/*.jar" />
+                </fileset>
+                <fileset dir="${lib-dir}">
                     <include name="**/*.jar" />
                 </fileset>
             </classpath>

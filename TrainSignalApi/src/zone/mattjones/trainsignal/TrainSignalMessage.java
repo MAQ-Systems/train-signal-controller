@@ -40,20 +40,20 @@ public class TrainSignalMessage {
     }
     
     // Different states for a signal to be in
-    private static final int SIGNAL_BASE    = 1;  // 00000001
-    private static final int SIGNAL_BLINK   = 2;  // 00000010
-    private static final int SIGNAL_RED     = 4;  // 00000100
-    private static final int SIGNAL_YELLOW  = 8;  // 00001000
-    private static final int SIGNAL_GREEN   = 16; // 00010000
-    private static final int SIGNAL_LAMP_ON = 32; // 00100000
-    private static final int SIGNAL_LAMP_OFF= 64; // 01000000
-    
+    private static final byte SIGNAL_BASE     = 1;  // 00000001
+    private static final byte SIGNAL_BLINK    = 2;  // 00000010
+    private static final byte SIGNAL_RED      = 4;  // 00000100
+    private static final byte SIGNAL_YELLOW   = 8;  // 00001000
+    private static final byte SIGNAL_GREEN    = 16; // 00010000
+    private static final byte SIGNAL_LAMP_ON  = 32; // 00100000
+    private static final byte SIGNAL_LAMP_OFF = 64; // 01000000
+
     /** The character all messages should end with. */
     private static final char MESSAGE_TERMINATING_CHAR = '!';
 
     /** The acknowledgement message expected for each message sent to the signal. */
-    private static final String ACK_MESSAGE = "" + ((char) 0) + MESSAGE_TERMINATING_CHAR;
-    
+    public static final byte[] ACK_MESSAGE = {SIGNAL_BASE, MESSAGE_TERMINATING_CHAR};
+
     /** Private constructor to prevent instantiation. */
     private TrainSignalMessage() {}
     
@@ -102,7 +102,16 @@ public class TrainSignalMessage {
      * @param message The message to check.
      * @return Whether a message received from the signal is an acknowledgment of a sent message.
      */
-    public static boolean isAckMessage(String message) {
-        return message != null && ACK_MESSAGE.equals(message);
+    public static boolean isAckMessage(byte[] message) {
+        return message != null && message.length == ACK_MESSAGE.length &&
+                ACK_MESSAGE[0] == message[0] && ACK_MESSAGE[1] == message[1];
+    }
+
+    /**
+     * @param message The message to check.
+     * @return Whether the message is a properly terminated message (contains the end character).
+     */
+    public static boolean isTerminatedMessage(byte[] message) {
+        return message != null && message.length > 0 && message[message.length - 1] == MESSAGE_TERMINATING_CHAR;
     }
 }
