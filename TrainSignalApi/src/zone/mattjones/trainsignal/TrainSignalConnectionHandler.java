@@ -45,18 +45,38 @@ public class TrainSignalConnectionHandler extends Thread {
     @Override
     public void run() {
         while (!mStopServer) {
-            try {
-                if (mServerSocket == null || mServerSocket.isClosed()) {
-                    mServerSocket = new ServerSocket(mPort);
-                }
+            // If something happened to the server socket, reinitialize it.
+            if (mServerSocket == null || mServerSocket.isClosed()) {
+                try {
+                    if (mServerSocket != null) {
+                        mServerSocket.close();
+                        mServerSocket = null;
+                    }
 
+                    mServerSocket = new ServerSocket(mPort);
+                } catch (IOException ex) {
+                    mServerSocket = null;
+
+                    System.err.println(
+                            "[error]: Failed to create server socket: " + ex.getMessage());
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        System.err.println(
+                                "[info]: Sleep interrupted for server socket reconnect: " +
+                                        ex.getMessage());
+                    }
+                }
+            }
+
+            if (mServerSocket == null) {
+                continue;
+            }
+
+            try {
                 // Block until a connection is made. Currently, it's only possible to run with a
                 // single connected client.
-                Socket newConnection = mServerSocket.accept();
-                if (mActiveClientSocket != null && mActiveClientSocket.isConnected()) {
-                    mActiveClientSocket.close();
-                }
-                mActiveClientSocket = newConnection;
+                mActiveClientSocket = mServerSocket.accept();
 
                 while (mActiveClientSocket.isConnected() && !mActiveClientSocket.isClosed()) {
                     sendMessages();
@@ -70,12 +90,18 @@ public class TrainSignalConnectionHandler extends Thread {
                     }
                 }
 
-                if (!mActiveClientSocket.isClosed()) {
-                    mActiveClientSocket.close();
-                }
-
             } catch (IOException e) {
                 System.err.println("[error]: Messaging thread exception: " + e.getMessage());
+            } finally {
+                if (!mActiveClientSocket.isClosed()) {
+                    try {
+                        mActiveClientSocket.close();
+                    } catch (IOException ex) {
+                        System.err.println(
+                                "[error]: Failed to close signal socket: " + ex.getMessage());
+                    }
+                }
+                mActiveClientSocket = null;
             }
         }
     }
