@@ -108,6 +108,14 @@ public class TrainSignalApi extends HttpServlet {
 
     @Override
     public void destroy() {
+        if (mConnectionHandler != null) {
+            try {
+                mConnectionHandler.killServer();
+            } catch (IOException ex) {
+                System.err.println("[error]: Error shutting down signal connection handler! " +
+                        ex.getMessage());
+            }
+        }
         if (mScheduler != null) {
             mScheduler.shutdown();
         }

@@ -139,7 +139,6 @@ public class TrainSignalConnectionHandler extends Thread {
             return;
         }
 
-        System.err.println("CURRENT MESSAGE QUEUE " + mMessages.size());
         while (!mMessages.isEmpty()) {
             byte[] curMessage = mMessages.poll();
             System.err.println(Integer.toBinaryString((int)curMessage[0]));
