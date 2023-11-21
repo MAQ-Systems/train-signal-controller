@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+    <title>Local Train CTC</title>
+    <link rel="icon" type="image/x-icon" href="./favicon.png">
+    <style>
+        html {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            padding: 0px;
+        }
+
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            padding: 0px;
+            background-color: #595959;
+        }
+
+        .main {
+            max-width: 400px;
+            height: 100%;
+            margin: 0px auto 0px auto;
+        }
+
+        .header {
+            padding: 20px;
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+
+        .header_text {
+            height: 50px;
+            width: 250px;
+            display: block;
+            padding: 0px 0px 0px 25px;
+        }
+
+        .title {
+            color: #ffffff;
+            font-family: arial, sans-serif;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-align: left;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            display: block;
+        }
+
+        .subtitle {
+            color: #ffffff;
+            font-family: arial, sans-serif;
+            font-size: 0.8em;
+            text-align: left;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            display: block;
+        }
+
+        .button_container {
+            width: 280px;
+            padding: 0px 15px 0px 15px;
+            margin: 0px auto 0px auto;
+        }
+
+        .button_row {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .button {
+            box-sizing: border-box;
+            position: relative;
+            display: block;
+            margin: 8px;
+        }
+
+        .full_button {
+            width: 266px;
+            height: 125px;
+        }
+
+        .half_button {
+            width: 125px;
+            height: 125px;
+        }
+
+        .stripes {
+            background: url("./stripe_overlay.png");
+            background-repeat: repeat;
+            display: block;
+            width: 90px;
+            height: 90px;
+            margin: 11px;
+        }
+
+        #green_button {
+            background-color: #00e24d;
+            border: solid 7px #69ee88;
+        }
+
+        #yellow_button {
+            background-color: #f6f000;
+            border: solid 7px #fff980;
+        }
+
+        #yellow_flashing_button {
+            background-color: #f6f000;
+            border: solid 7px #fff980;
+        }
+
+        #red_button {
+            background-color: #ff5a41;
+            border: solid 7px #ff7761;
+        }
+
+        #red_flashing_button {
+            background-color: #ff5a41;
+            border: solid 7px #ff7761;
+        }
+
+        .copyright {
+            width: 100%;
+            margin-top: 25px;
+            text-align: center;
+            font-family: arial, sans-serif;
+            font-size: 0.75em;
+            color: #414141;
+            letter-spacing: 0.25em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main">
+    <div class="header">
+        <img src="train_signal.png">
+        <div class="header_text">
+            <span class="title">Local CTC</span>
+            <span class="subtitle">Train Signal Controller</span>
+        </div>
+    </div>
+
+    <div class="button_container">
+        <div class="button_row">
+            <div id="green_button" class="button full_button"></div>
+        </div>
+
+        <div class="button_row">
+            <div id="yellow_button" class="button half_button"></div>
+            <div id="yellow_flashing_button" class="button half_button">
+                <div class="stripes"></div>
+            </div>
+        </div>
+
+        <div class="button_row">
+            <div id="red_button" class="button half_button"></div>
+            <div id="red_flashing_button" class="button half_button">
+                <div class="stripes"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="copyright">Copyright 2023 Matt Jones</div>
+</div>
+
+<script>
+    const COLOR_GREEN = "g";
+    const COLOR_YELLOW = "y";
+    const COLOR_RED = "r";
+
+    const LAMP_ON = "1";
+    const LAMP_OFF = "0";
+    const LAMP_BLINK = "b";
+
+    const API_CALL_INTERVAL_MS = 1000;
+    let lastApiCallTime = 0;
+
+    function makeApiCall(color, lamp) {
+        if (Date.now() - lastApiCallTime < API_CALL_INTERVAL_MS) {
+            console.log("[error]: Made an API call too quickly!");
+            return;
+        }
+        lastApiCallTime = Date.now();
+
+        let req = new XMLHttpRequest();
+        req.open("GET", "https://api.mattjones.zone/train/api?color=" + color + "&lamp=" + lamp);
+        req.onload = () => {
+            if (req.status == 200) {
+                console.log("[info]: Signal updated: " + color + " / " + lamp);
+            } else {
+                console.log("[error]: Signal update failed!");
+            }
+        };
+        req.send();
+    }
+
+    document.getElementById("green_button").onclick = (e) => {
+        makeApiCall(COLOR_GREEN, LAMP_ON);
+    };
+
+    document.getElementById("yellow_button").onclick = (e) => {
+        makeApiCall(COLOR_YELLOW, LAMP_ON);
+    };
+
+    document.getElementById("yellow_flashing_button").onclick = (e) => {
+        makeApiCall(COLOR_YELLOW, LAMP_BLINK);
+    };
+
+    document.getElementById("red_button").onclick = (e) => {
+        makeApiCall(COLOR_RED, LAMP_ON);
+    };
+
+    document.getElementById("red_flashing_button").onclick = (e) => {
+        makeApiCall(COLOR_RED, LAMP_BLINK);
+    };
+</script>
+
+</body>
+</html>
