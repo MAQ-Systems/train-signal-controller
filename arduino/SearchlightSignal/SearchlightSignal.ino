@@ -163,7 +163,10 @@ void loop() {
     // parse the message and switch appropriate pins
     SignalMessage* sm = parseSignalMessage(readBuffer, readBufferPos);
 
+    bool isAck = false;
     if(sm != NULL) {
+      bool isAck = sm->isAck;
+
       readWasMessage = true;
       handleSignalMessage(sm);
       delete sm;
@@ -175,9 +178,10 @@ void loop() {
     }
   }
 
-  // If a signal was received, wait 2.5 sec for it to change.
-  if (readWasMessage) {
-    delay(2500);
+  // If a signal was received, wait 2 sec for it to change unless the message
+  // was an "ack".
+  if (readWasMessage && !isAck) {
+    delay(2000);
   } else {
     // Otherwise poll every 500ms.
     delay(500);
