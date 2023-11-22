@@ -149,8 +149,9 @@ void loop() {
 
   // Whether the network read was a signal message or empty.
   bool readWasMessage = false;
-  
-  // wait for signal to switch for a bit before trying to read another (2.5 sec)
+  bool isAck = false;
+
+  // wait for signal to switch for a bit before trying to read another (2 sec)
   if(client.connected()) {
     readBufferPos = 0;
     while((readBuffer[readBufferPos] = client.read()) != -1
@@ -163,7 +164,6 @@ void loop() {
     // parse the message and switch appropriate pins
     SignalMessage* sm = parseSignalMessage(readBuffer, readBufferPos);
 
-    bool isAck = false;
     if(sm != NULL) {
       bool isAck = sm->isAck;
 
