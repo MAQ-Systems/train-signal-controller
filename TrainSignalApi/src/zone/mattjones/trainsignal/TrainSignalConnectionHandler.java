@@ -141,7 +141,6 @@ public class TrainSignalConnectionHandler extends Thread {
 
         while (!mMessages.isEmpty()) {
             byte[] curMessage = mMessages.poll();
-            System.err.println(Integer.toBinaryString((int)curMessage[0]));
 
             mActiveClientSocket.getOutputStream().write(curMessage);
             mActiveClientSocket.getOutputStream().flush();
