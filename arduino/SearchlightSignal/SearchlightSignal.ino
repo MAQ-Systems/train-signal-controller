@@ -74,6 +74,7 @@ int serverPort = 19100;
 EthernetClient client;
 char readBuffer[BUFFER_SIZE];
 int readBufferPos;
+SignalMessage currentSignalState;
 
 // prototypes
 boolean connectToServer();
@@ -96,6 +97,9 @@ void setup() {
 
   setColor(SignalColor::RED);
   setLamp(LampState::ON);
+  currentSignalState.color = SignalColor::RED;
+  currentSignalState.lampState = LampState::ON;
+  currentSignalState.isAck = false;
   
   // Try to get connection through dhcp.
   if(Ethernet.begin(mac) == 0) {
@@ -225,8 +229,20 @@ void handleSignalMessage(SignalMessage* sm) {
   if (sm->isAck) {
     Serial.println("  Ping pong");
   } else {
-    setColor(sm->color);
-    setLamp(sm->lampState);
+    // Don't update the color or lamp state unless the values actually changed.
+    // Updating to the values would otherwise cause the relays to cycle
+    // unnecessarily.
+    if (sm->color != currentSignalState.color) {
+      setColor(sm->color);
+    }
+
+    if (sm->lampState != sm->lampState) {
+      setLamp(sm->lampState);
+    }
+
+    currentSignalState.color = sm->color;
+    currentSignalState.lampState = sm->lampState;
+
     Serial.println("\n");
   }
 }
