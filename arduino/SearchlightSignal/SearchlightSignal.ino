@@ -236,7 +236,7 @@ void handleSignalMessage(SignalMessage* sm) {
       setColor(sm->color);
     }
 
-    if (sm->lampState != sm->lampState) {
+    if (sm->lampState != currentSignalState.lampState) {
       setLamp(sm->lampState);
     }
 
